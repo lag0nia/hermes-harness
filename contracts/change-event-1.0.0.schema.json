@@ -1,0 +1,234 @@
+{
+  "$defs": {
+    "Effort": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "title": "Effort",
+      "type": "string"
+    },
+    "Intent": {
+      "enum": [
+        "calendar.create_vtodo",
+        "calendar.create_event",
+        "calendar.update",
+        "calendar.delete",
+        "calendar.list",
+        "pi.health.read",
+        "pi.jobs.list",
+        "pi.jobs.cancel",
+        "browser.research",
+        "browser.order.prepare",
+        "browser.form.prepare",
+        "browser.auth_required",
+        "travel.plan",
+        "travel.search_flights",
+        "travel.search_stays",
+        "technical.research",
+        "technical.plan",
+        "technical.change",
+        "technical.review",
+        "code.plan",
+        "code.change",
+        "code.review",
+        "docs.reconcile",
+        "docs.query",
+        "general.answer",
+        "general.clarify"
+      ],
+      "title": "Intent",
+      "type": "string"
+    },
+    "ModelPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "context_size_justification": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Context Size Justification"
+        },
+        "effort": {
+          "$ref": "#/$defs/Effort"
+        },
+        "model": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "const": "openai-codex",
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "effort"
+      ],
+      "title": "ModelPolicy",
+      "type": "object"
+    },
+    "RiskClass": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "change_kind": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Change Kind",
+      "type": "string"
+    },
+    "changed_paths": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Changed Paths",
+      "type": "array"
+    },
+    "context_references": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Context References",
+      "type": "array"
+    },
+    "delivery_target": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Delivery Target",
+      "type": "string"
+    },
+    "event_type": {
+      "const": "change",
+      "title": "Event Type",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "intent": {
+      "$ref": "#/$defs/Intent"
+    },
+    "job_id": {
+      "format": "uuid",
+      "title": "Job Id",
+      "type": "string"
+    },
+    "message": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "model_policy": {
+      "$ref": "#/$defs/ModelPolicy"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "origin_profile": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Origin Profile",
+      "type": "string"
+    },
+    "origin_session": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Origin Session",
+      "type": "string"
+    },
+    "parent_job_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Job Id"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "risk_class": {
+      "$ref": "#/$defs/RiskClass"
+    },
+    "schema_version": {
+      "pattern": "^1\\.0\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "trace_id": {
+      "format": "uuid",
+      "title": "Trace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "job_id",
+    "trace_id",
+    "origin_profile",
+    "origin_session",
+    "delivery_target",
+    "intent",
+    "idempotency_key",
+    "risk_class",
+    "model_policy",
+    "context_references",
+    "sequence",
+    "occurred_at",
+    "message",
+    "payload",
+    "event_type",
+    "changed_paths",
+    "change_kind"
+  ],
+  "title": "ChangeEvent",
+  "type": "object"
+}

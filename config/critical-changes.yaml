@@ -1,0 +1,13 @@
+version: 1
+requires_confirmation:
+  - secrets_credentials
+  - purchasing_payment
+  - security_permissions
+  - network_api_gateway_exposure
+  - root_broker
+  - data_memory_conversation_deletion
+  - destructive_database_migration
+  - disable_audit_rollback_tests
+  - sol_above_high
+  - all_profile_changes
+  - conflicted_core_update_rebase

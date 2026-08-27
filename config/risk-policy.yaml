@@ -1,0 +1,8 @@
+version: 1
+intent_defaults:
+  calendar.create_vtodo: low
+  calendar.delete: medium
+  browser.order.prepare: high
+  technical.change: high
+  code.change: high
+default: medium

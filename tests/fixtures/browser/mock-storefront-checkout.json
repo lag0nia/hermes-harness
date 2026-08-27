@@ -1,0 +1,8 @@
+{
+  "name": "mock-storefront-checkout",
+  "states": [
+    {"refs": {"submit": "r1"}, "done": false},
+    {"refs": {"submit": "r2"}, "done": true}
+  ],
+  "expected": {"outcome": "succeeded", "screenshots_persist": false}
+}

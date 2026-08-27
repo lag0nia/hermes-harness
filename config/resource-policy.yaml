@@ -1,0 +1,26 @@
+# Adaptive scheduler policy (values are intentionally explicit).
+capacity_units: 4
+max_jobs: 5
+reserve_units: 1
+browser_singleton: true
+unit_costs:
+  remote: 1
+  research: 1
+  travel: 1
+  documentator: 1
+  visual_auditor: 1
+  engineer: 2
+  coder: 2
+  browser: 3
+memory:
+  reserve_bytes: 471859200
+  admission_ratio: 0.75
+  pause_ratio: 0.85
+  resume_ratio: 0.70
+load:
+  admission: 2.5
+  pause: 3.5
+  resume: 3.0
+heartbeat_seconds: 60
+stale_worker_seconds: 300
+transient_retries: 2

@@ -1,0 +1,28 @@
+version: 1
+routes:
+  calendar.create_vtodo: {direct_tool: nextcloud_put_item, capability: default}
+  calendar.create_event: {direct_tool: nextcloud_put_item, capability: default}
+  calendar.update: {direct_tool: nextcloud_put_item, capability: default, confirmation: conditional}
+  calendar.delete: {direct_tool: nextcloud_delete_item, capability: default, confirmation: conditional}
+  calendar.list: {direct_tool: nextcloud_list_items, capability: default}
+  pi.health.read: {direct_tool: pi_health, capability: default}
+  pi.jobs.list: {direct_tool: control_plane_jobs_list, capability: default}
+  pi.jobs.cancel: {direct_tool: control_plane_jobs_cancel, capability: default}
+  browser.research: {profile: browser-operator}
+  browser.order.prepare: {profile: browser-operator, confirmation: required_for_submit}
+  browser.form.prepare: {profile: browser-operator, confirmation: required_for_submit}
+  browser.auth_required: {profile: browser-operator, confirmation: user_login}
+  travel.plan: {profile: travel-planner}
+  travel.search_flights: {profile: travel-planner}
+  travel.search_stays: {profile: travel-planner}
+  technical.research: {profile: researcher}
+  technical.plan: {profile: architect-planner}
+  technical.change: {profile: engineer, confirmation: policy}
+  technical.review: {profile: engineer}
+  code.plan: {profile: coder}
+  code.change: {profile: coder, confirmation: policy}
+  code.review: {profile: coder}
+  docs.reconcile: {profile: documentator}
+  docs.query: {profile: documentator}
+  general.answer: {direct_tool: orchestrator_answer, capability: default}
+  general.clarify: {direct_tool: orchestrator_clarify, capability: default}

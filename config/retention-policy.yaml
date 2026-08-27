@@ -1,0 +1,8 @@
+version: 1
+protected_from_deletion: [conversations, sessions, memories]
+screenshots:
+  persistence: ephemeral
+  delete_on: [success, failure, cancellation]
+  keep_requires_explicit_decision: true
+structured_logs:
+  redacted: true

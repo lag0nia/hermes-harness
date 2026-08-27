@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+knowledge/generated-test/
+.replay-shadow.jsonl
+*.db
+*.db-shm
+*.db-wal

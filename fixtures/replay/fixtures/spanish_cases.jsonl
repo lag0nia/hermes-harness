@@ -1,0 +1,8 @@
+{"id":"error-1","category":"errores","text":"Error: no funciona la tarea, ¿puedes ayudarme?"}
+{"id":"multi-1","category":"multi-intent","text":"Crea una tarea y también busca un vuelo a Madrid"}
+{"id":"followup-1","category":"followup","text":"Sobre lo de antes, ¿qué día quedamos?"}
+{"id":"cancel-1","category":"cancel","text":"Cancela el trabajo que dejaste preparado"}
+{"id":"calendar-ambiguous-1","category":"calendario_ambiguo","text":"Pon una tarea mañana, pero no sé a qué hora"}
+{"id":"browser-1","category":"browser","text":"Busca en el navegador información sobre esta página"}
+{"id":"travel-1","category":"travel","text":"¿Qué vuelos hay a Lisboa el viernes?"}
+{"id":"self-1","category":"self-improvement","text":"Propón una mejora para que aprendas de este error"}

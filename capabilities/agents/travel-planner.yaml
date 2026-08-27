@@ -1,0 +1,7 @@
+schema_version: 1.0.0
+profile: travel-planner
+required_skills: [travel-planning]
+allowed_tools: [plan_trip, search_flights, search_stays]
+model: {provider: openai-codex, default: gpt-5.6-luna, efforts: [medium, high]}
+risk_classes: [low]
+confirmation_policy: never

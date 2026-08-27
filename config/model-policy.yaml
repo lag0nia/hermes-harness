@@ -1,0 +1,18 @@
+version: 1
+provider: openai-codex
+sol:
+  allowed_intents: [technical.review, code.review]
+  maximum_effort: high
+models_900k:
+  allowed_profiles: [researcher, engineer, coder]
+  allowed_intents: [technical.research, technical.change, technical.review, code.change, code.review]
+  requires_context_size_justification: true
+profiles:
+  default: {models: [gpt-5.6-luna], efforts: [low, medium, high]}
+  browser-operator: {models: [gpt-5.6-terra], efforts: [high, xhigh]}
+  researcher: {models: [gpt-5.6-luna], efforts: [medium, high]}
+  architect-planner: {models: [gpt-5.6-luna], efforts: [medium]}
+  engineer: {models: [gpt-5.6-terra], efforts: [high, xhigh]}
+  coder: {models: [gpt-5.6-terra], efforts: [high, xhigh]}
+  documentator: {models: [gpt-5.6-luna], efforts: [low, medium]}
+  travel-planner: {models: [gpt-5.6-luna], efforts: [medium, high]}

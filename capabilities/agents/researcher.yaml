@@ -1,0 +1,7 @@
+schema_version: 1.0.0
+profile: researcher
+required_skills: [grounded-citations]
+allowed_tools: [web_search, web_extract]
+model: {provider: openai-codex, default: gpt-5.6-luna, efforts: [medium, high]}
+risk_classes: [low]
+confirmation_policy: never

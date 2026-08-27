@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "ErrorCode": {
+      "enum": [
+        "INVALID_INPUT",
+        "UNKNOWN_INTENT",
+        "MISSING_REQUIRED_INPUT",
+        "AMBIGUOUS_TARGET",
+        "CAPABILITY_UNAVAILABLE",
+        "PERMISSION_DENIED",
+        "CONFIRMATION_REQUIRED",
+        "CONFIRMATION_EXPIRED",
+        "CONFIRMATION_DIGEST_MISMATCH",
+        "AUTHENTICATION_REQUIRED",
+        "PROVIDER_UNAVAILABLE",
+        "RATE_LIMITED",
+        "RESOURCE_PRESSURE",
+        "EXTERNAL_STATE_CHANGED",
+        "VERIFICATION_FAILED",
+        "IDEMPOTENCY_CONFLICT",
+        "WORKER_STALE",
+        "CYCLE_DETECTED",
+        "CANCELLED_BY_USER",
+        "ROLLBACK_FAILED"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "$ref": "#/$defs/ErrorCode"
+    },
+    "details": {
+      "additionalProperties": true,
+      "title": "Details",
+      "type": "object"
+    },
+    "message": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "message"
+  ],
+  "title": "TypedError",
+  "type": "object"
+}
