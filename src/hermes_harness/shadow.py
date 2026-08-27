@@ -6,12 +6,15 @@ only an append-only observation log containing sanitized user text and small dec
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+from hermes_harness.observability import ObservabilitySink, emit_job_observation
 
 _SECRET_PATTERNS = (
     re.compile(r"(?i)\b(?:token|password|contraseña|secret|clave|api[_ -]?key)\s*[:=]\s*[^\s,;]+"),
@@ -79,9 +82,15 @@ class ShadowDecision:
 class ShadowLogger:
     """Compare candidate routing while legacy remains authoritative."""
 
-    def __init__(self, path: Path, kill_switch: KillSwitch | None = None) -> None:
+    def __init__(
+        self,
+        path: Path,
+        kill_switch: KillSwitch | None = None,
+        observability: ObservabilitySink | None = None,
+    ) -> None:
         self.path = path
         self.kill_switch = kill_switch or KillSwitch()
+        self._observability = observability
         self._metrics = {"observations": 0, "matches": 0, "divergences": 0, "policy_violations": 0}
 
     @property
@@ -109,6 +118,17 @@ class ShadowLogger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(asdict(decision), ensure_ascii=False, sort_keys=True) + "\n")
+        job_key = hashlib.sha256(safe_text.encode("utf-8")).hexdigest()
+        emit_job_observation(
+            self._observability,
+            job_id=f"shadow:{job_key}",
+            event_type=f"shadow.{outcome}",
+            component="shadow",
+            phase="compare",
+            status=outcome,
+            summary="Shadow comparison completed",
+            metadata={"authoritative_path": "legacy"},
+        )
         return decision
 
 

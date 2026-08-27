@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+from hermes_harness.observability import ObservabilitySink, emit_job_observation
+
 
 class ConfirmationError(ValueError):
     pass
@@ -48,8 +50,25 @@ class ConfirmationPreview:
 
 
 class ConfirmationManager:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, observability: ObservabilitySink | None = None) -> None:
         self.path = path
+        self._observability = observability
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as connection:
+            connection.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS confirmations (
+                    confirmation_id TEXT PRIMARY KEY,
+                    job_id TEXT NOT NULL,
+                    digest TEXT NOT NULL,
+                    operation_json TEXT NOT NULL,
+                    external_state_version TEXT NOT NULL,
+                    issued_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    used_at TEXT
+                );
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30, isolation_level=None)
@@ -102,6 +121,17 @@ class ConfirmationManager:
                 ),
             )
             connection.commit()
+        emit_job_observation(
+            self._observability,
+            job_id=str(job_id),
+            event_type="confirmation.issued",
+            component="confirmations",
+            phase="approval",
+            status="pending",
+            summary="Confirmation issued for a bounded operation",
+            metadata={"confirmation_id": str(confirmation_id), "state": "pending"},
+            critical=True,
+        )
         return ConfirmationPreview(confirmation_id, UUID(str(job_id)), digest, expires_at)
 
     def consume(
@@ -124,6 +154,7 @@ class ConfirmationManager:
             if row is None:
                 connection.rollback()
                 raise ConfirmationDigestMismatch("unknown confirmation")
+            stored_job_id = str(row["job_id"])
             if row["used_at"] is not None:
                 connection.rollback()
                 raise ConfirmationUsed("confirmation callback was already consumed")
@@ -144,3 +175,14 @@ class ConfirmationManager:
                 connection.rollback()
                 raise ConfirmationUsed("confirmation callback was already consumed")
             connection.commit()
+        emit_job_observation(
+            self._observability,
+            job_id=stored_job_id,
+            event_type="confirmation.consumed",
+            component="confirmations",
+            phase="approval",
+            status="approved",
+            summary="Confirmation consumed",
+            metadata={"confirmation_id": str(confirmation_id), "state": "consumed"},
+            critical=True,
+        )

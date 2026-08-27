@@ -1,0 +1,27 @@
+version: 1
+initial_phase: shadow
+allow_shadow_execution: false
+allow_read_only_execution: true
+allow_confirmed_noncommercial: false
+blocked_side_effect_classes:
+  - reversible
+  - irreversible
+blocked_intents:
+  - calendar.create_vtodo
+  - calendar.create_event
+  - calendar.update
+  - calendar.delete
+  - pi.jobs.cancel
+  - browser.order.prepare
+  - browser.auth_required
+  - technical.change
+  - code.change
+  - docs.reconcile
+commercial_keywords:
+  - cart
+  - checkout
+  - payment
+  - purchase
+  - order.submit
+  - booking.final
+  - reservation.final

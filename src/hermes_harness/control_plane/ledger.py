@@ -9,9 +9,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from hermes_harness.control_plane.contracts import IntentEnvelope
+from hermes_harness.observability import ObservabilitySink, emit_observation
 
 
 class IdempotencyConflict(ValueError):
@@ -68,6 +69,7 @@ ALLOWED_TRANSITIONS: dict[JobState, set[JobState]] = {
 @dataclass(frozen=True)
 class JobRecord:
     job_id: UUID
+    trace_id: UUID
     idempotency_key: str
     state: JobState
     origin_profile: str
@@ -87,8 +89,9 @@ class LedgerEvent:
 
 
 class Ledger:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, observability: ObservabilitySink | None = None) -> None:
         self.path = path
+        self._observability = observability
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._migrate()
 
@@ -203,7 +206,9 @@ class Ledger:
             )
             self._append_event(connection, envelope.job_id, "state", JobState.QUEUED, {})
             connection.commit()
-        return self.get_job(envelope.job_id)
+        record = self.get_job(envelope.job_id)
+        self._observe(record, "ledger.job_created", record.state.value.lower())
+        return record
 
     def get_job(self, job_id: UUID) -> JobRecord:
         with self._connect() as connection:
@@ -227,7 +232,9 @@ class Ledger:
                 raise InvalidTransition(f"{current} -> {new_state}")
             self._set_state(connection, job_id, new_state)
             connection.commit()
-        return self.get_job(job_id)
+        record = self.get_job(job_id)
+        self._observe(record, "ledger.state_changed", record.state.value.lower())
+        return record
 
     def request_cancel(self, job_id: UUID, *, atomic_section: bool) -> JobRecord:
         with self._connect() as connection:
@@ -252,7 +259,9 @@ class Ledger:
             else:
                 self._set_state(connection, job_id, JobState.CANCELLED)
             connection.commit()
-        return self.get_job(job_id)
+        record = self.get_job(job_id)
+        self._observe(record, "ledger.cancel_requested", record.state.value.lower())
+        return record
 
     def attach_kanban_task(self, job_id: UUID, task_id: str) -> JobRecord:
         if not task_id.strip():
@@ -278,7 +287,9 @@ class Ledger:
                     connection, job_id, "kanban_attached", None, {"kanban_task_id": task_id}
                 )
             connection.commit()
-        return self.get_job(job_id)
+        record = self.get_job(job_id)
+        self._observe(record, "ledger.kanban_attached", "success")
+        return record
 
     def finish_atomic_and_cancel(self, job_id: UUID, read_back: dict[str, Any]) -> JobRecord:
         with self._connect() as connection:
@@ -295,7 +306,9 @@ class Ledger:
             self._append_event(connection, job_id, "verification", None, read_back)
             self._set_state(connection, job_id, JobState.CANCELLED)
             connection.commit()
-        return self.get_job(job_id)
+        record = self.get_job(job_id)
+        self._observe(record, "ledger.cancelled", record.state.value.lower())
+        return record
 
     def events(self, job_id: UUID) -> list[LedgerEvent]:
         with self._connect() as connection:
@@ -312,6 +325,21 @@ class Ledger:
             )
             for row in rows
         ]
+
+    def _observe(self, record: JobRecord, event_type: str, status: str) -> None:
+        emit_observation(
+            self._observability,
+            trace_id=record.trace_id,
+            span_id=uuid4(),
+            job_id=record.job_id,
+            event_type=event_type,
+            component="ledger",
+            phase="state",
+            status=status,
+            summary="Control-plane ledger state recorded",
+            metadata={"state": record.state.value},
+            occurred_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+        )
 
     @staticmethod
     def _append_event(
@@ -342,6 +370,7 @@ class Ledger:
     def _row_to_job(row: sqlite3.Row) -> JobRecord:
         return JobRecord(
             job_id=UUID(row["job_id"]),
+            trace_id=UUID(row["trace_id"]),
             idempotency_key=row["idempotency_key"],
             state=JobState(row["state"]),
             origin_profile=row["origin_profile"],

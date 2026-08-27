@@ -21,6 +21,7 @@ from hermes_harness.integrations.hermes_kanban import (
     KanbanAdapter,
     KanbanTask,
 )
+from hermes_harness.observability import ObservabilitySink, emit_observation
 
 DIRECT_INTENTS = frozenset(
     {
@@ -64,9 +65,16 @@ class DispatchResult:
 
 
 class Dispatcher:
-    def __init__(self, *, ledger: Ledger, kanban: KanbanAdapter) -> None:
+    def __init__(
+        self,
+        *,
+        ledger: Ledger,
+        kanban: KanbanAdapter,
+        observability: ObservabilitySink | None = None,
+    ) -> None:
         self.ledger = ledger
         self.kanban = kanban
+        self._observability = observability
         self._sequences: dict[UUID, int] = {}
         self._last_activity: dict[UUID, datetime] = {}
 
@@ -79,6 +87,19 @@ class Dispatcher:
         if profile is None:
             if envelope.intent.value not in DIRECT_INTENTS:
                 raise ValueError(f"no Kanban route for intent: {envelope.intent.value}")
+            emit_observation(
+                self._observability,
+                trace_id=envelope.trace_id,
+                job_id=job.job_id,
+                session_id=envelope.origin_session,
+                profile=envelope.origin_profile,
+                event_type="dispatcher.direct",
+                component="dispatcher",
+                phase="dispatch",
+                status="success",
+                summary=f"Direct intent dispatched: {envelope.intent.value}",
+                metadata={"intent": envelope.intent.value},
+            )
             return DispatchResult(job.job_id, None, True)
         if job.kanban_task_id:
             return DispatchResult(job.job_id, job.kanban_task_id, False)
@@ -94,6 +115,19 @@ class Dispatcher:
         )
         self._store_task_id(job.job_id, task_id)
         self._last_activity[job.job_id] = datetime.now(UTC)
+        emit_observation(
+            self._observability,
+            trace_id=envelope.trace_id,
+            job_id=job.job_id,
+            session_id=envelope.origin_session,
+            profile=envelope.origin_profile,
+            event_type="dispatcher.delegated",
+            component="dispatcher",
+            phase="dispatch",
+            status="success",
+            summary=f"Delegated intent: {envelope.intent.value}",
+            metadata={"intent": envelope.intent.value, "worker_profile": profile},
+        )
         return DispatchResult(job.job_id, task_id, False)
 
     def heartbeat(self, job_id: UUID) -> None:

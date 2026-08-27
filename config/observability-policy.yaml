@@ -1,0 +1,24 @@
+schema_version: observability-policy-1.0.0
+central_db: /opt/data/hermes-harness/var/observability.sqlite3
+contract: observability-event-1.0.0
+normal_queue:
+  mode: asynchronous
+  fail_open: true
+  max_events: 1024
+critical_audit:
+  mode: synchronous
+  fail_closed: true
+limits:
+  max_query_events: 200
+  sqlite_bytes: 536870912
+  ordinary_retention_days: 30
+  incident_retention_days: 180
+  export_retention_days: 7
+privacy:
+  key_mode: "0600"
+  hmac_algorithm: HMAC-SHA256
+  store_raw_content: false
+rollout:
+  phase: shadow
+  min_shadow_hours: 24
+  automatic_promotion: false

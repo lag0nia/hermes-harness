@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from hermes_harness.observability import ObservabilitySink, emit_job_observation
+
 
 class Surface(StrEnum):
     DESKTOP = "desktop"
@@ -42,8 +44,14 @@ class OutboundMessage:
 class DeliveryRouter:
     """Routes notifications without network I/O; callers send OutboundMessage later."""
 
-    def __init__(self, *, telegram_extra_target: str = "telegram") -> None:
+    def __init__(
+        self,
+        *,
+        telegram_extra_target: str = "telegram",
+        observability: ObservabilitySink | None = None,
+    ) -> None:
         self.telegram_extra_target = telegram_extra_target
+        self._observability = observability
         self._seen: set[str] = set()
         self._connected: dict[str, bool] = {}
         self._history: dict[str, list[OutboundMessage]] = {}
@@ -79,6 +87,16 @@ class DeliveryRouter:
             for target in targets:
                 message = self._message(event, target)
                 self._history.setdefault(event.job_id, []).append(message)
+                emit_job_observation(
+                    self._observability,
+                    job_id=event.job_id,
+                    event_type=f"delivery.{event.event_type.value}",
+                    component="delivery",
+                    phase="send",
+                    status="sent" if self._connected.get(target, True) else "disconnected",
+                    summary="Delivery attempt recorded",
+                    metadata={"target_category": target.split(":", 1)[0]},
+                )
                 if self._connected.get(target, True):
                     messages.append(message)
         return messages

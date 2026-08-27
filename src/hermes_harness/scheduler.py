@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from hermes_harness.observability import ObservabilitySink, emit_job_observation
+
 
 @dataclass(frozen=True)
 class LoadAverage:
@@ -84,6 +86,7 @@ class AdaptiveScheduler:
         pause_load: float = 3.5,
         resume_memory_ratio: float = 0.70,
         resume_load: float = 3.0,
+        observability: ObservabilitySink | None = None,
     ) -> None:
         self.capacity_units, self.max_jobs, self.reserve_units = (
             capacity_units,
@@ -96,6 +99,7 @@ class AdaptiveScheduler:
         )
         self.admission_load, self.pause_load = admission_load, pause_load
         self.resume_memory_ratio, self.resume_load = resume_memory_ratio, resume_load
+        self._observability = observability
         self._paused: dict[str, JobSpec] = {}
 
     def observe(self, snapshot: ResourceSnapshot) -> ResourceSnapshot:
@@ -144,7 +148,23 @@ class AdaptiveScheduler:
             for job_id in list(self._paused):
                 job = self._paused.pop(job_id)
                 resumed.append(job_id)
-        return ScheduleDecision(admitted, paused, resumed, rejected, snapshot)
+        decision = ScheduleDecision(admitted, paused, resumed, rejected, snapshot)
+        emit_job_observation(
+            self._observability,
+            job_id="scheduler",
+            event_type="scheduler.decision",
+            component="scheduler",
+            phase="admission",
+            status="rejected" if rejected else "success",
+            summary="Scheduler completed an admission decision",
+            metadata={
+                "admitted_count": len(admitted),
+                "paused_count": len(paused),
+                "resumed_count": len(resumed),
+                "rejected_count": len(rejected),
+            },
+        )
+        return decision
 
 
 class LinuxResourceAdapter:

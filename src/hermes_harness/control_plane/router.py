@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 from hermes_harness.control_plane.contracts import Intent, IntentEnvelope
+from hermes_harness.observability import ObservabilitySink, emit_observation
 
 
 class RoutingDenied(ValueError):
@@ -24,9 +25,15 @@ class Route:
 
 
 class Router:
-    def __init__(self, routes: dict[Intent, dict[str, Any]], manifests: dict[str, dict[str, Any]]):
+    def __init__(
+        self,
+        routes: dict[Intent, dict[str, Any]],
+        manifests: dict[str, dict[str, Any]],
+        observability: ObservabilitySink | None = None,
+    ):
         self._routes = routes
         self._manifests = manifests
+        self._observability = observability
 
     @property
     def configured_intents(self) -> tuple[Intent, ...]:
@@ -76,12 +83,26 @@ class Router:
             config = self._routes[envelope.intent]
         except KeyError as exc:
             raise RoutingDenied(f"unknown intent: {envelope.intent}") from exc
-        return Route(
+        result = Route(
             envelope=envelope,
             profile=config.get("profile"),
             direct_tool=config.get("direct_tool"),
             confirmation=config.get("confirmation", "none"),
         )
+        emit_observation(
+            self._observability,
+            trace_id=envelope.trace_id,
+            job_id=envelope.job_id,
+            session_id=envelope.origin_session,
+            profile=envelope.origin_profile,
+            event_type="router.decision",
+            component="router",
+            phase="route",
+            status="success",
+            summary=f"Route selected for {envelope.intent.value}",
+            metadata={"intent": envelope.intent.value, "profile": result.profile},
+        )
+        return result
 
     def route_many(self, envelopes: list[IntentEnvelope]) -> list[Route]:
         by_id = {item.job_id: item for item in envelopes}

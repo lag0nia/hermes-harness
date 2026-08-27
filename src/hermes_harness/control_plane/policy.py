@@ -5,8 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import yaml
+
+from hermes_harness.observability import ObservabilitySink, emit_observation
 
 
 class PolicyDenied(ValueError):
@@ -25,10 +28,12 @@ class PolicyEngine:
         model_policy: dict[str, Any],
         critical: set[str],
         protected: set[str],
+        observability: ObservabilitySink | None = None,
     ) -> None:
         self._models = model_policy
         self._critical = critical
         self._protected = protected
+        self._observability = observability
 
     @classmethod
     def from_directory(cls, directory: Path) -> PolicyEngine:
@@ -49,8 +54,36 @@ class PolicyEngine:
 
     def evaluate(self, payload: dict[str, Any]) -> PolicyDecision:
         reasons: set[str] = set()
-        self._evaluate_job(payload, reasons)
-        return PolicyDecision(bool(reasons), tuple(sorted(reasons)))
+        try:
+            self._evaluate_job(payload, reasons)
+        except PolicyDenied as exc:
+            trace = _payload_uuid(payload, "trace_id")
+            if trace is not None:
+                emit_observation(
+                    self._observability,
+                    trace_id=trace,
+                    event_type="policy.denied",
+                    component="policy",
+                    phase="authorize",
+                    status="denied",
+                    summary="Policy denied the operation",
+                    metadata={"reason_code": type(exc).__name__},
+                )
+            raise
+        decision = PolicyDecision(bool(reasons), tuple(sorted(reasons)))
+        trace = _payload_uuid(payload, "trace_id")
+        if trace is not None:
+            emit_observation(
+                self._observability,
+                trace_id=trace,
+                event_type="policy.evaluated",
+                component="policy",
+                phase="authorize",
+                status="confirmation_required" if decision.requires_confirmation else "allowed",
+                summary="Policy evaluation completed",
+                metadata={"requires_confirmation": decision.requires_confirmation},
+            )
+        return decision
 
     def _evaluate_job(self, job: dict[str, Any], reasons: set[str]) -> None:
         intent = str(job.get("intent", ""))
@@ -121,3 +154,11 @@ class PolicyEngine:
         elif isinstance(value, list):
             for nested in value:
                 self._inspect_operation(nested, reasons)
+
+
+def _payload_uuid(payload: dict[str, Any], key: str) -> UUID | None:
+    value = payload.get(key)
+    try:
+        return UUID(str(value)) if value else None
+    except (ValueError, AttributeError):
+        return None

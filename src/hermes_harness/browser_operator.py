@@ -14,6 +14,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
+from uuid import UUID, uuid4
+
+from hermes_harness.observability import ObservabilitySink, emit_observation
 
 
 class Risk(StrEnum):
@@ -68,11 +71,13 @@ class BrowserOperator:
         screenshot_dir: Path | None = None,
         confidence_threshold: float = 0.8,
         sol_review: Callable[[dict[str, Any]], bool] | None = None,
+        observability: ObservabilitySink | None = None,
     ) -> None:
         self.adapter = adapter
         self.screenshot_dir = screenshot_dir
         self.confidence_threshold = confidence_threshold
         self.sol_review = sol_review
+        self._observability = observability
 
     @staticmethod
     def _fingerprint(observation: dict[str, Any]) -> str:
@@ -93,12 +98,29 @@ class BrowserOperator:
             text,
         )
 
-    def run(self, steps: list[Step], *, cancel: Callable[[], bool] | None = None) -> BrowserResult:
+    def run(
+        self,
+        steps: list[Step],
+        *,
+        cancel: Callable[[], bool] | None = None,
+        trace_id: UUID | None = None,
+    ) -> BrowserResult:
         logs: list[dict[str, Any]] = []
         shots: list[str] = []
         invalidated: set[str] = set()
         sol_reviews = 0
         seen_fingerprints: set[str] = set()
+        trace = trace_id or uuid4()
+        emit_observation(
+            self._observability,
+            trace_id=trace,
+            event_type="browser.lifecycle",
+            component="browser-operator",
+            phase="observe",
+            status="started",
+            summary="Browser operation started",
+            metadata={"step_count": len(steps)},
+        )
         try:
             if cancel and cancel():
                 return BrowserResult(Outcome.CANCELLED, (), tuple(logs), (), sol_reviews)
@@ -212,3 +234,13 @@ class BrowserOperator:
                         candidate.unlink()
                 except Exception:
                     pass
+            emit_observation(
+                self._observability,
+                trace_id=trace,
+                event_type="browser.cleanup",
+                component="browser-operator",
+                phase="cleanup",
+                status="completed",
+                summary="Browser screenshots cleaned up",
+                metadata={"screenshot_count": len(shots)},
+            )
