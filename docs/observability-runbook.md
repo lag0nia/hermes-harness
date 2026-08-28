@@ -106,7 +106,9 @@ hermes observe purge execute --trace <TRACE_ID> \
 - Si falla una escritura normal, la operación continúa y el contador de pérdida
   aparece en `health`.
 - Si falla una auditoría crítica, la operación con cambio externo se bloquea.
-- Si Luna falla técnicamente, se intenta Terra.
+- La explicación usa `gpt-5.6-luna` con `xhigh`; si la llamada falla o la
+  respuesta estructurada no supera la validación, se reintenta la misma
+  explicación con `gpt-5.6-terra`, también con `xhigh`.
 - Si Luna y Terra fallan, se devuelve el diagnóstico determinista.
 - Si el estado externo cambió antes de verificarlo, el trabajo termina como
   fallido y no se repite automáticamente una mutación.
