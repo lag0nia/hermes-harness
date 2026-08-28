@@ -15,6 +15,36 @@ Esta entrega no incluye:
 - una espera de 24 horas;
 - una fase previa de solo observar o solo consultar.
 
+## Routing automático de mensajes
+
+El primer tramo de routing de contenido está preparado para el gateway
+`default`. Hermes debe tener el multiplexado de perfiles activo y una lista de
+perfiles servidos explícita. La configuración actual limita el routing
+automático a `researcher` y `engineer`:
+
+```yaml
+gateway:
+  multiplex_profiles: true
+  multiplex_profile_allowlist: [researcher, engineer]
+```
+
+El plugin `hermes-auto-routing` usa el hook oficial
+`pre_gateway_dispatch`. Solo fija un perfil cuando una única regla
+determinista coincide. Las preguntas genéricas, las coincidencias ambiguas y
+los perfiles ya asignados permanecen en el perfil actual (`default`). El
+plugin no recibe ni persiste credenciales, cookies o historial completo.
+
+Ejemplos:
+
+- diagnóstico de logs o errores → `researcher`;
+- cambio o revisión inequívoca de código/configuración → `engineer`;
+- cualquier otro mensaje → `default`.
+
+La escalada condicional `researcher → engineer` todavía debe ejecutarse como
+un job tipado del control plane: `engineer` solo se crea si el investigador
+marca un posible defecto del sistema. No se debe llamar a ambos perfiles por
+defecto.
+
 ## Comprobaciones locales
 
 En el harness:

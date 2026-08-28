@@ -1,0 +1,16 @@
+schema_version: message-routing-1.0.0
+policy:
+  unknown_or_ambiguous: default
+  explicit_profile_route_wins: true
+  max_hops: 1
+routes:
+  technical.research:
+    profile: researcher
+    requires_all:
+      - diagnostic_action
+      - technical_evidence
+  technical.change:
+    profile: engineer
+    requires_all:
+      - engineering_action
+      - engineering_context
