@@ -1,41 +1,41 @@
 {
   "version": "1.0.0",
-  "source_count": 12,
+  "source_count": 14,
   "packs": [
     {
       "profile": "architect-planner",
       "path": "architect-planner.md",
-      "sha256": "6cc8ea5024ec3253ad1d56a636c0335accbe491f24ed76fb1415d62003871930"
+      "sha256": "cb54b4c36b7e7d56da8efd02926a42323bac7df1a4ac1b4834ec9ae179352327"
     },
     {
       "profile": "browser-operator",
       "path": "browser-operator.md",
-      "sha256": "38829ab4af6c14381ba5e8af6a4158633e3dd59b54c8d602c262b65524b146ab"
+      "sha256": "2dd98330134eda183fc951e222c021388c421db569293a2beaaff1022e760b5a"
     },
     {
       "profile": "coder",
       "path": "coder.md",
-      "sha256": "9ae31453093a2805147476a120d5f33a5175f3599b6e7a641c80773ec24d6468"
+      "sha256": "5717442af9a68b3f288709680f1eb209de7d81d46094fa21434e2a5ed6b1794d"
     },
     {
       "profile": "documentator",
       "path": "documentator.md",
-      "sha256": "df97a7a180790de4aec6c7bf91f653343dc2103880893b3b445a789e862bf438"
+      "sha256": "16efd1d8e52c4f176a89f88c63e4dc2696c05ce232e5fac7634020d6821fc392"
     },
     {
       "profile": "engineer",
       "path": "engineer.md",
-      "sha256": "5066795b4eb6fff6a7c5f5cca6f14ae08fd658c204b826f6731567a0b06838dd"
+      "sha256": "7dce9ba1d6114e01116b93604d11da7bdc0d84e38129a61e32846e4fd5ee656f"
     },
     {
       "profile": "researcher",
       "path": "researcher.md",
-      "sha256": "c8c73e93828af5639a5de63cddcf24049dc8ca78cdf6838cf31fb511c7e5bf26"
+      "sha256": "7738a815a688604673ce9d35eaa57fe96958c0b192e0a3a5e8635e1f50ba4df4"
     },
     {
       "profile": "travel-planner",
       "path": "travel-planner.md",
-      "sha256": "e61274113bd140657c42c6f4581909b865bb5ce20a0e77adadb7a90bcf58df6b"
+      "sha256": "6fc12d92432a94e444b51a09d3e5b769bc7f0528e567825d767117f9f8a83c07"
     }
   ],
   "profiles": [

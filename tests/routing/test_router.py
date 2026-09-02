@@ -21,6 +21,16 @@ def test_every_closed_intent_has_one_deterministic_route() -> None:
         assert bool(first.profile) ^ bool(first.direct_tool)
 
 
+def test_development_coordinate_is_validated_against_default_manifest() -> None:
+    router = Router.from_files(ROOT / "config/routing.yaml", ROOT / "capabilities/agents")
+    normalized = IntentEnvelope.model_validate(envelope(intent=Intent.DEVELOPMENT_COORDINATE.value))
+
+    route = router.route(normalized)
+
+    assert route.profile == "default"
+    assert route.direct_tool is None
+
+
 def test_missing_capability_or_unknown_route_is_denied_by_default(tmp_path: Path) -> None:
     routing = tmp_path / "routing.yaml"
     routing.write_text("version: 1\nroutes:\n  technical.research:\n    profile: missing\n")

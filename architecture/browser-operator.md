@@ -2,7 +2,7 @@
 
 The Browser Operator is an injectable Observe–Decide–Act–Verify–Recover machine. Its
 adapter exposes only sanitized semantic observations, actions, verification, screenshot
-capture, and screenshot deletion; it has no browser, network, credential, or Uber
+capture, and screenshot deletion; it has no browser, network, credential, or commerce
 implementation.
 
 * DOM/SOM references from an observation are invalidated after every mutation.

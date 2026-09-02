@@ -19,6 +19,7 @@ routes:
   technical.plan: {profile: architect-planner}
   technical.change: {profile: engineer, confirmation: policy}
   technical.review: {profile: engineer}
+  development.coordinate: {profile: default}
   code.plan: {profile: coder}
   code.change: {profile: coder, confirmation: policy}
   code.review: {profile: coder}

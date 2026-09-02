@@ -5,4 +5,5 @@ allowed_tools: [read_file, write_file, patch, terminal]
 model: {provider: openai-codex, default: gpt-5.6-terra, efforts: [high, xhigh]}
 risk_classes: [low, medium, high]
 confirmation_policy: policy
-write_denylists: [/opt/data/hermes-harness, /opt/data/profiles]
+# Deployment expands these variables to the local protected roots.
+write_denylists: ["${HERMES_HARNESS_ROOT}", "${HERMES_PROFILES_ROOT}"]

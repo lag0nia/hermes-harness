@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol
 
 from hermes_harness.observability import ObservabilitySink, emit_job_observation
@@ -19,10 +19,17 @@ from hermes_harness.observability import ObservabilitySink, emit_job_observation
 class KanbanTask:
     task_id: str
     title: str
-    prompt: str
-    profile: str
-    reasoning_effort: str
-    metadata: Mapping[str, str] = field(default_factory=dict)
+    body: str
+    assignee: str
+    idempotency_key: str
+    parent_task_ids: tuple[str, ...] = ()
+    initial_status: str = "running"
+    skills: tuple[str, ...] = ()
+    model: str | None = None
+    provider: str | None = None
+    workspace: str | None = None
+    project: str | None = None
+    goal: bool = False
 
 
 class KanbanAdapter(Protocol):
@@ -60,21 +67,32 @@ class HermesKanbanCLI:
         return self._runner(("hermes", "kanban", *args))
 
     def create_task(self, task: KanbanTask) -> str:
-        # ``--reasoning-effort`` is Hermes Kanban's native per-task override.
-        output = self._call(
+        args = [
             "create",
-            "--title",
             task.title,
-            "--prompt",
-            task.prompt,
-            "--profile",
-            task.profile,
-            "--reasoning-effort",
-            task.reasoning_effort,
-            "--metadata",
-            json.dumps(dict(task.metadata), sort_keys=True),
-        )
-        task_id = output.rsplit(maxsplit=1)[-1]
+            "--body",
+            task.body,
+            "--assignee",
+            task.assignee,
+        ]
+        for parent_task_id in task.parent_task_ids:
+            args.extend(("--parent", parent_task_id))
+        args.extend(("--idempotency-key", task.idempotency_key))
+        args.extend(("--initial-status", task.initial_status))
+        for skill in task.skills:
+            args.extend(("--skill", skill))
+        if task.model is not None:
+            args.extend(("--model", task.model))
+        if task.provider is not None:
+            args.extend(("--provider", task.provider))
+        if task.workspace is not None:
+            args.extend(("--workspace", task.workspace))
+        if task.project is not None:
+            args.extend(("--project", task.project))
+        if task.goal:
+            args.append("--goal")
+        output = self._call(*args, "--json")
+        task_id = self._task_id_from_output(output)
         emit_job_observation(
             self._observability,
             job_id=task_id,
@@ -83,8 +101,25 @@ class HermesKanbanCLI:
             phase="dispatch",
             status="success",
             summary="Kanban task created",
-            metadata={"profile": task.profile},
+            metadata={"profile": task.assignee},
         )
+        return task_id
+
+    @staticmethod
+    def _task_id_from_output(output: str) -> str:
+        decoded: object
+        try:
+            decoded = json.loads(output)
+        except json.JSONDecodeError:
+            decoded = None
+        fallback_task_id = output.rsplit(maxsplit=1)[-1] if output.split() else ""
+        if isinstance(decoded, Mapping):
+            candidate: object = decoded.get("id")
+            task_id = candidate.strip() if isinstance(candidate, str) else fallback_task_id
+        else:
+            task_id = fallback_task_id
+        if not task_id:
+            raise ValueError("Hermes Kanban did not return a task id")
         return task_id
 
     def heartbeat(self, task_id: str) -> None:
@@ -124,7 +159,7 @@ class HermesKanbanCLI:
         )
 
     def block(self, task_id: str, reason: str) -> None:
-        self._call("block", task_id, "--reason", reason)
+        self._call("block", task_id, reason)
         emit_job_observation(
             self._observability,
             job_id=task_id,

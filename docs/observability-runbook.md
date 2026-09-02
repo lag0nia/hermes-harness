@@ -11,7 +11,7 @@ Esta entrega no incluye:
 - una prueba E2E real desde Desktop;
 - una prueba de rollback o apagado;
 - una revisión independiente de seguridad;
-- pruebas por CLI o Telegram;
+- pruebas por CLI o canal de mensajería;
 - una espera de 24 horas;
 - una fase previa de solo observar o solo consultar.
 
@@ -61,7 +61,7 @@ En el plugin:
 uv run pytest -q
 uv run ruff check .
 uv run mypy
-/opt/hermes/bin/hermes plugins doctor . --ci
+hermes plugins doctor . --ci
 ```
 
 ## Estado y consultas

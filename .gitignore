@@ -12,3 +12,20 @@ knowledge/generated-test/
 *.db
 *.db-shm
 *.db-wal
+
+# Local runtime state and exports
+var/
+*.sqlite3
+*.sqlite3-*
+*.jsonl
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*
+secrets*

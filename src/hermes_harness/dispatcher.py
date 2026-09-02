@@ -6,10 +6,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from hermes_harness.control_plane.contracts import (
     AgentEvent,
+    Intent,
     IntentEnvelope,
     ProgressEvent,
     StateEvent,
@@ -62,6 +63,26 @@ class DispatchResult:
     job_id: UUID
     kanban_task_id: str | None
     direct: bool
+    children: tuple[DevelopmentWorkflowStep, ...] = ()
+
+
+@dataclass(frozen=True)
+class DevelopmentWorkflowStep:
+    envelope: IntentEnvelope
+    kanban_task_id: str
+
+
+@dataclass(frozen=True)
+class DevelopmentWorkflowResult:
+    parent_job_id: UUID
+    steps: tuple[DevelopmentWorkflowStep, ...]
+
+
+DEVELOPMENT_WORKFLOW: tuple[tuple[str, Intent, str], ...] = (
+    ("research", Intent.TECHNICAL_RESEARCH, "researcher"),
+    ("plan", Intent.TECHNICAL_PLAN, "architect-planner"),
+    ("change", Intent.TECHNICAL_CHANGE, "engineer"),
+)
 
 
 class Dispatcher:
@@ -79,10 +100,15 @@ class Dispatcher:
         self._last_activity: dict[UUID, datetime] = {}
 
     def dispatch(self, envelope: IntentEnvelope) -> DispatchResult:
-        try:
-            job = self.ledger.get_job(envelope.job_id)
-        except KeyError:
-            job = self.ledger.create_job(envelope)
+        if envelope.intent is Intent.DEVELOPMENT_COORDINATE:
+            workflow = self.coordinate_development(envelope)
+            return DispatchResult(
+                job_id=workflow.parent_job_id,
+                kanban_task_id=None,
+                direct=False,
+                children=workflow.steps,
+            )
+        job = self._ensure_job(envelope)
         profile = PROFILE_BY_INTENT.get(envelope.intent.value)
         if profile is None:
             if envelope.intent.value not in DIRECT_INTENTS:
@@ -107,10 +133,11 @@ class Dispatcher:
             KanbanTask(
                 task_id="",
                 title=envelope.intent.value,
-                prompt=envelope.source_text,
-                profile=profile,
-                reasoning_effort=envelope.model_policy.effort.value,
-                metadata={"job_id": str(job.job_id), "trace_id": str(envelope.trace_id)},
+                body=envelope.source_text,
+                assignee=profile,
+                idempotency_key=envelope.idempotency_key,
+                model=envelope.model_policy.model,
+                provider=envelope.model_policy.provider,
             )
         )
         self._store_task_id(job.job_id, task_id)
@@ -129,6 +156,39 @@ class Dispatcher:
             metadata={"intent": envelope.intent.value, "worker_profile": profile},
         )
         return DispatchResult(job.job_id, task_id, False)
+
+    def coordinate_development(self, envelope: IntentEnvelope) -> DevelopmentWorkflowResult:
+        """Create the deterministic research, plan, and implementation workflow."""
+        if envelope.intent is not Intent.DEVELOPMENT_COORDINATE:
+            raise ValueError("development workflow requires development.coordinate intent")
+
+        parent = self._ensure_job(envelope)
+        parent_task_id = parent.kanban_task_id
+        dependency: UUID | None = None
+        steps: list[DevelopmentWorkflowStep] = []
+        for stage, intent, assignee in DEVELOPMENT_WORKFLOW:
+            child = self._development_child_envelope(envelope, stage, intent, dependency)
+            job = self._ensure_job(child)
+            task_id = job.kanban_task_id
+            if task_id is None:
+                task_id = self.kanban.create_task(
+                    KanbanTask(
+                        task_id="",
+                        title=child.intent.value,
+                        body=child.source_text,
+                        assignee=assignee,
+                        idempotency_key=child.idempotency_key,
+                        parent_task_ids=(parent_task_id,) if parent_task_id else (),
+                        model=child.model_policy.model,
+                        provider=child.model_policy.provider,
+                    )
+                )
+                self._store_task_id(child.job_id, task_id)
+                self._last_activity[child.job_id] = datetime.now(UTC)
+            steps.append(DevelopmentWorkflowStep(child, task_id))
+            dependency = child.job_id
+            parent_task_id = task_id
+        return DevelopmentWorkflowResult(envelope.job_id, tuple(steps))
 
     def heartbeat(self, job_id: UUID) -> None:
         task_id = self.ledger.get_job(job_id).kanban_task_id
@@ -204,5 +264,48 @@ class Dispatcher:
     def _store_task_id(self, job_id: UUID, task_id: str) -> None:
         self.ledger.attach_kanban_task(job_id, task_id)
 
+    def _ensure_job(self, envelope: IntentEnvelope) -> JobRecord:
+        try:
+            return self.ledger.get_job(envelope.job_id)
+        except KeyError:
+            return self.ledger.create_job(envelope)
 
-__all__ = ["HEARTBEAT_SECONDS", "STALE_SECONDS", "DispatchResult", "Dispatcher"]
+    @staticmethod
+    def _development_child_envelope(
+        parent: IntentEnvelope,
+        stage: str,
+        intent: Intent,
+        dependency: UUID | None,
+    ) -> IntentEnvelope:
+        idempotency_key = f"{parent.idempotency_key}:{stage}"
+        if len(idempotency_key) > 256:
+            idempotency_key = str(
+                uuid5(parent.job_id, f"development-coordinate:{stage}:idempotency")
+            )
+        return IntentEnvelope(
+            schema_version=parent.schema_version,
+            job_id=uuid5(parent.job_id, f"development-coordinate:{stage}"),
+            parent_job_id=parent.job_id,
+            trace_id=parent.trace_id,
+            origin_profile=parent.origin_profile,
+            origin_session=parent.origin_session,
+            delivery_target=parent.delivery_target,
+            intent=intent,
+            idempotency_key=idempotency_key,
+            risk_class=parent.risk_class,
+            model_policy=parent.model_policy,
+            context_references=list(parent.context_references),
+            parameters=dict(parent.parameters),
+            source_text=parent.source_text,
+            dependencies=[dependency] if dependency else [],
+        )
+
+
+__all__ = [
+    "HEARTBEAT_SECONDS",
+    "STALE_SECONDS",
+    "DevelopmentWorkflowResult",
+    "DevelopmentWorkflowStep",
+    "DispatchResult",
+    "Dispatcher",
+]

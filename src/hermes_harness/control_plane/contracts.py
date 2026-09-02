@@ -42,6 +42,7 @@ class Intent(StrEnum):
     TECHNICAL_PLAN = "technical.plan"
     TECHNICAL_CHANGE = "technical.change"
     TECHNICAL_REVIEW = "technical.review"
+    DEVELOPMENT_COORDINATE = "development.coordinate"
     CODE_PLAN = "code.plan"
     CODE_CHANGE = "code.change"
     CODE_REVIEW = "code.review"

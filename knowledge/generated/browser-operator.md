@@ -8,6 +8,27 @@
 Documentator es el único writer de documentación y knowledge packs. Solo `default` puede proponer hechos para Holographic Memory después de comprobar contradicciones. Las skills no conceden permisos.
 
 
+<!-- source: architecture/browser-operator.md -->
+# Browser Operator
+
+The Browser Operator is an injectable Observe–Decide–Act–Verify–Recover machine. Its
+adapter exposes only sanitized semantic observations, actions, verification, screenshot
+capture, and screenshot deletion; it has no browser, network, credential, or commerce
+implementation.
+
+* DOM/SOM references from an observation are invalidated after every mutation.
+* Confidence below the configured threshold produces `NEED_INPUT` without acting.
+* An unverifiable delivery receives at most one equivalent retry; repeated state
+  fingerprints produce `NEED_INPUT` rather than a no-op loop.
+* Critical actions and semantic/visual conflicts require the injected independent Sol
+  review callback. Sol is requested at medium effort by the change pipeline.
+* Screenshots are temporary evidence and are deleted in success, failure, cancellation,
+  and crash recovery paths. Persistent evidence is structured, fingerprinted, and
+  redacted logs only.
+
+Fixtures use a fake adapter and never contact a real browser or storefront.
+
+
 <!-- source: architecture/security-boundaries.md -->
 # Límites de seguridad
 
@@ -47,7 +68,7 @@ Documentator compila fuentes verificadas y es el único writer de docs/packs. Wo
 <!-- source: knowledge/shared/policy.md -->
 # Conocimiento compartido
 
-fact: timezone=Europe/Madrid
+fact: timezone=deployment-configured
 
 La documentación humana está en español; keys y enums de contratos permanecen en inglés. Los packs generados son read-only y reproducibles.
 
@@ -67,7 +88,7 @@ Pausa jobs; no cruces de proveedor automáticamente. Reintenta dos veces solo si
 <!-- source: runbooks/reconciliation.md -->
 # Reconciliación semanal
 
-El job de reconciliación se programa los domingos a las 04:00 en `Europe/Madrid`. Consume únicamente eventos verificados, recompila packs, valida enlaces, hashes, staleness y contradicciones, y emite propuestas de memoria.
+El job de reconciliación se programa según la configuración de despliegue y la zona horaria configurada. Consume únicamente eventos verificados, recompila packs, valida enlaces, hashes, staleness y contradicciones, y emite propuestas de memoria.
 
 La política es de continuidad y no-borrado: no elimina sesiones, conversaciones, memorias ni fuentes. Screenshots siguen siendo efímeras según el runbook de recuperación.
 
@@ -89,6 +110,29 @@ Desactiva dispatch especialista con el kill switch, conserva ledger y sesiones, 
 Cualquier violación de permisos detiene la promoción.
 
 
+<!-- source: runbooks/task-15-replay-shadow.md -->
+# Task 15 — replay y shadow (preparación software)
+
+Este runbook describe únicamente el harness offline. No exporta, muta ni borra
+sesiones reales y no cambia configuración viva.
+
+## Secuencia segura
+
+1. Ejecutar `uv run pytest tests/replay -q`.
+2. Ejecutar el replay con `uv run python scripts/replay_routing.py fixtures/replay/fixtures/spanish_cases.jsonl --log /tmp/task-15-shadow.jsonl`.
+3. Verificar `policy_violations == 0`, que `authoritative_path` sea siempre `legacy`
+y revisar divergencias antes de promover.
+4. Ante una divergencia o violación, accionar el único `KillSwitch`: primero
+`rollback_to("read_only")`; si procede, `trip("<motivo>")`. No habilitar promoción
+desde el replay.
+
+## Pendiente operacional
+
+La ventana de observación de **24 horas sigue pendiente operacional**. Este
+artefacto no la inicia, no la simula y no la da por cumplida. Requiere una
+aprobación/checkpoint operativo posterior, con health check y rollback listo.
+
+
 <!-- source: runbooks/worker-recovery.md -->
 # Runbook de recuperación de worker
 
@@ -99,7 +143,7 @@ Heartbeat cada 60 segundos; marca stale tras 5 minutos. Cancela de forma idempot
 # Browser Operator
 
 ## Misión
-Operar únicamente sobre superficies de navegador autorizadas, especialmente Uber Eats, con observación semántica y verificación posterior. Nunca escribo contraseñas, tokens ni datos de pago.
+Operar únicamente sobre superficies de navegador autorizadas, especialmente servicios de comercio autorizados, con observación semántica y verificación posterior. Nunca escribo contraseñas, tokens ni datos de pago.
 
 ## Procedimiento
 1. Observar estado tipado/AX antes de decidir.

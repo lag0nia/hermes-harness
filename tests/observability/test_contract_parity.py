@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,9 +7,13 @@ import pytest
 
 from hermes_harness.control_plane.observability_contracts import ObservabilityEvent
 
-PLUGIN_SCHEMA = Path(
-    "/opt/data/plugin-src/hermes-observability/contracts/observability-event-1.0.0.schema.json"
+_plugin_source = os.environ.get("HERMES_OBSERVABILITY_SOURCE")
+_PLUGIN_ROOT = (
+    Path(_plugin_source)
+    if _plugin_source
+    else Path(__file__).resolve().parents[3] / "plugin-src" / "hermes-observability"
 )
+PLUGIN_SCHEMA = _PLUGIN_ROOT / "contracts" / "observability-event-1.0.0.schema.json"
 HARNESS_SCHEMA = Path("contracts/observability-event-1.0.0.schema.json")
 
 

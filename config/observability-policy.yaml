@@ -1,5 +1,5 @@
 schema_version: observability-policy-1.0.0
-central_db: /opt/data/hermes-harness/var/observability.sqlite3
+central_db: var/observability.sqlite3
 contract: observability-event-1.0.0
 normal_queue:
   mode: asynchronous

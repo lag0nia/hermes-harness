@@ -35,7 +35,7 @@ def test_compile_generates_pack_for_every_profile_and_manifest_hashes() -> None:
 def test_links_and_contradictions_are_rejected() -> None:
     assert validate_links("See [system](architecture/system.md)", ROOT) == []
     assert validate_links("[missing](missing.md)", ROOT)
-    assert find_contradictions(["fact: timezone=Europe/Madrid", "fact: timezone=UTC"])
+    assert find_contradictions(["fact: timezone=deployment-configured", "fact: timezone=UTC"])
 
 
 def test_compiler_fails_on_contradictory_sources(tmp_path: Path) -> None:
@@ -44,6 +44,6 @@ def test_compiler_fails_on_contradictory_sources(tmp_path: Path) -> None:
     (tmp_path / "profiles" / "default").mkdir(parents=True)
     (tmp_path / "profiles" / "default" / "SOUL.md").write_text("# Default\n")
     (source / "one.md").write_text("fact: timezone=UTC\n")
-    (source / "two.md").write_text("fact: timezone=Europe/Madrid\n")
+    (source / "two.md").write_text("fact: timezone=America/New_York\n")
     with pytest.raises(ValueError, match="contradiction"):
         compile_packs(tmp_path, tmp_path / "out")

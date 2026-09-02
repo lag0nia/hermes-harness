@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 from uuid import UUID
 
@@ -10,6 +10,7 @@ from hermes_harness.control_plane.contracts import IntentEnvelope
 from hermes_harness.control_plane.phase_policy import Phase, PhasePolicy
 from hermes_harness.control_plane.policy import PolicyDenied, PolicyEngine
 from hermes_harness.control_plane.router import Router, RoutingDenied
+from hermes_harness.dispatcher import Dispatcher
 from hermes_harness.observability import Observation, SQLiteObservabilitySink
 
 READ_ONLY_INTENTS = PhasePolicy.read_only_intents
@@ -30,6 +31,21 @@ class BridgePlan:
     mode: str
     allowed: bool
     reason: str | None = None
+    dispatch: BridgeDispatch | None = None
+
+
+@dataclass(frozen=True)
+class BridgeDispatchChild:
+    job_id: UUID
+    kanban_task_id: str
+
+
+@dataclass(frozen=True)
+class BridgeDispatch:
+    job_id: UUID
+    direct: bool
+    kanban_task_id: str | None
+    children: tuple[BridgeDispatchChild, ...] = ()
 
 
 class ObservabilityBridge:
@@ -39,11 +55,13 @@ class ObservabilityBridge:
         policy: PolicyEngine,
         sink: SQLiteObservabilitySink,
         phase_policy: PhasePolicy | None = None,
+        dispatcher: Dispatcher | None = None,
     ) -> None:
         self.router = router
         self.policy = policy
         self.sink = sink
         self.phase_policy = phase_policy or PhasePolicy()
+        self.dispatcher = dispatcher
 
     def plan(self, envelope: IntentEnvelope, *, mode: str = "shadow") -> BridgePlan:
         if mode not in {"shadow", "read_only", "full"}:
@@ -102,7 +120,24 @@ class ObservabilityBridge:
         result = self.plan(envelope, mode="full")
         if not result.allowed:
             raise BridgeDenied(result.reason or "operation denied")
-        return result
+        if self.dispatcher is None:
+            return result
+        dispatch = self.dispatcher.dispatch(envelope)
+        return replace(
+            result,
+            dispatch=BridgeDispatch(
+                job_id=dispatch.job_id,
+                direct=dispatch.direct,
+                kanban_task_id=dispatch.kanban_task_id,
+                children=tuple(
+                    BridgeDispatchChild(
+                        job_id=child.envelope.job_id,
+                        kanban_task_id=child.kanban_task_id,
+                    )
+                    for child in dispatch.children
+                ),
+            ),
+        )
 
     def trace_context(self, trace_id: UUID) -> dict[str, Any]:
         events = self.sink.trace_events(trace_id)
@@ -154,9 +189,24 @@ def build_stdio_server(bridge: ObservabilityBridge) -> Any:
 
     def plan_result(plan: BridgePlan) -> dict[str, Any]:
         result = asdict(plan)
+        result.pop("dispatch")
         result["trace_id"] = str(plan.trace_id)
         result["job_id"] = str(plan.job_id)
         return result
+
+    def dispatch_result(dispatch: BridgeDispatch) -> dict[str, Any]:
+        return {
+            "job_id": str(dispatch.job_id),
+            "direct": dispatch.direct,
+            "kanban_task_id": dispatch.kanban_task_id,
+            "children": [
+                {
+                    "job_id": str(child.job_id),
+                    "kanban_task_id": child.kanban_task_id,
+                }
+                for child in dispatch.children
+            ],
+        }
 
     @server.tool(name="harness_plan_intent", structured_output=True)
     def harness_plan_intent(envelope: dict[str, Any]) -> dict[str, Any]:
@@ -178,9 +228,13 @@ def build_stdio_server(bridge: ObservabilityBridge) -> Any:
     @server.tool(name="harness_submit", structured_output=True)
     def harness_submit(envelope: dict[str, Any]) -> dict[str, Any]:
         try:
+            result = bridge.submit_full(parse_envelope(envelope))
+            if result.dispatch is None:
+                raise BridgeDenied("full submission requires an attached dispatcher")
             return {
                 "ok": True,
-                "plan": plan_result(bridge.submit_full(parse_envelope(envelope))),
+                "plan": plan_result(result),
+                "dispatch": dispatch_result(result.dispatch),
             }
         except Exception as exc:
             return {"ok": False, "error": str(exc)[:512]}

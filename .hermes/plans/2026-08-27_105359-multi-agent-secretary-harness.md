@@ -6,7 +6,7 @@
 
 **Architecture:** The `default` profile remains the only user-facing orchestrator. It normalizes natural language into a closed `IntentEnvelope`; a local Control Plane validates that envelope and maps it deterministically to direct tools or a specialist Profile. Specialist work runs through Hermes Kanban workers with per-task reasoning effort, while short direct operations such as calendar and Pi health remain in the orchestrator. Documentation is centralized in this repository and compiled into shared and per-agent read-only knowledge packs.
 
-**Tech Stack:** Python 3.13, `uv`, Pydantic/JSON Schema, SQLite, YAML, Hermes Profiles/Bot Mode, Hermes Kanban, local MCP/plugin integration, pytest, Git worktrees/checkpoints, Mermaid/SVG diagrams, existing Pi-Tou repair/calendar/travel/Uber MCP tools.
+**Tech Stack:** Python 3.13, `uv`, Pydantic/JSON Schema, SQLite, YAML, Hermes Profiles/Bot Mode, Hermes Kanban, local MCP/plugin integration, pytest, Git worktrees/checkpoints, Mermaid/SVG diagrams, existing host, calendar, travel, and commerce MCP tools.
 
 ---
 
@@ -15,10 +15,10 @@
 ### 1.1 User-facing topology
 
 - One user-facing profile: `default`.
-- Normal surfaces: Telegram and Hermes Desktop.
+- Normal surfaces: a chat channel and the desktop client.
 - The surfaces use separate sessions in the same profile; shared state lives in the Control Plane ledger, documentation, and orchestrator memory.
 - Results return to the originating session.
-- Telegram receives additional notifications only for blocked confirmations and critical failures.
+- The chat channel receives additional notifications only for blocked confirmations and critical failures.
 - Normal messages show a short job name and state; internal IDs remain hidden unless needed for disambiguation.
 - A new message is attached to an active job by context or job ID. If two jobs are plausible, the orchestrator asks which one.
 
@@ -29,7 +29,7 @@ Create these Profiles with functional internal names and human-readable Desktop 
 | Profile | Model | Default effort | Purpose |
 |---|---|---:|---|
 | `default` | `openai-codex/gpt-5.6-luna` | `medium` | Secretary, intent normalization, calendar, Pi status, coordination |
-| `browser-operator` | `openai-codex/gpt-5.6-terra` | `high` | Browser/Uber operations and visual decisions |
+| `browser-operator` | `openai-codex/gpt-5.6-terra` | `high` | Browser/commerce operations and visual decisions |
 | `researcher` | `openai-codex/gpt-5.6-luna` | `medium` | Cited read-only investigation |
 | `architect-planner` | `openai-codex/gpt-5.6-luna` | `medium` | Technical plans, dependency graphs, risks, acceptance criteria |
 | `engineer` | `openai-codex/gpt-5.6-terra` | `high` | Hermes harness, skills, MCP, plugins, core modifications |
@@ -118,13 +118,13 @@ Documentator consumes verified `CHANGE_EVENT` and `LEARNING_EVENT` records, upda
 
 Protect conversations, sessions, and memories from automatic deletion. Screenshots are ephemeral and deleted at job completion/failure/cancellation; persist structured redacted logs instead. Keeping a screenshot requires a separate explicit user decision.
 
-Weekly documentation reconciliation: Sunday 04:00 `Europe/Madrid`, plus event-driven updates after verified changes.
+Weekly documentation reconciliation: the configured deployment schedule and timezone, plus event-driven updates after verified changes.
 
 ### 1.6 Calendar and health
 
 Calendar defaults:
 
-- Timezone: `Europe/Madrid`.
+- Timezone: configured by deployment.
 - “Tarea” without time means an all-day VTODO on the stated date.
 - An event without a required time becomes all-day; ask only when the requested semantics require a specific time.
 - Create without confirmation when unambiguous.
@@ -136,7 +136,7 @@ Pi health:
 - On-demand through `pi_health` from any user surface.
 - Existing deterministic host watchdog remains no-LLM.
 - Check every five minutes.
-- Alert by Telegram after two consecutive critical samples, deduplicated by incident fingerprint.
+- Alert by chat channel after two consecutive critical samples, deduplicated by incident fingerprint.
 - Essential service-down incidents may alert immediately.
 - Send recovery once normal.
 - Current host policy remains initially: temperature 70/80 C, memory 90/95%, root disk 80/90%.
@@ -144,7 +144,7 @@ Pi health:
 
 ### 1.7 Browser and travel
 
-Browser uses the existing managed Chromium/VNC session for Uber Eats and its typed broker tools. The user performs login manually when requested; the agent never types passwords or handles secrets.
+Browser uses the existing managed Chromium/VNC session for an authorized commerce service and its typed broker tools. The user performs login manually when requested; the agent never types passwords or handles secrets.
 
 Perception/action stack:
 
@@ -181,10 +181,10 @@ Travel v1 is read-only through `plan_trip`, `search_flights`, and `search_stays`
 
 ## 2. Repository layout
 
-Create a dedicated Git repository at `/opt/data/hermes-harness`:
+Create a dedicated Git repository at `${HERMES_HARNESS_ROOT}`:
 
 ```text
-/opt/data/hermes-harness/
+${HERMES_HARNESS_ROOT}/
 ├── pyproject.toml
 ├── README.md
 ├── src/hermes_harness/
@@ -452,7 +452,7 @@ ROLLBACK_FAILED
 4. Implement cancel semantics: immediate outside atomic sections; finish/read-back current atomic action then cancel.
 5. Implement confirmation digest over exact operation, target, amount, options, address/destination, and external-state version.
 6. Enforce 30-minute expiry and immediate invalidation on digest/state change.
-7. Test duplicate Telegram deliveries, process restart, stale confirmation, modified cart, and repeated callback.
+7. Test duplicate chat-channel deliveries, process restart, stale confirmation, modified cart, and repeated callback.
 
 ### Task 6: Integrate Hermes Kanban as worker execution bus
 
@@ -484,10 +484,10 @@ ROLLBACK_FAILED
 
 1. Deliver start, blocked/waiting, material milestones for long work, and terminal state.
 2. Return normal results to origin session.
-3. Send Telegram extra only for blocked confirmations and critical failures.
+3. Send an extra chat-channel notification only for blocked confirmations and critical failures.
 4. Hide IDs normally; reveal short ID for ambiguity/status/debugging.
 5. Deduplicate outbound messages and preserve role alternation.
-6. Test Desktop-origin, Telegram-origin, disconnected origin, duplicate callback, and later status query from the other surface.
+6. Test desktop-origin, chat-channel-origin, disconnected origin, duplicate callback, and later status query from the other surface.
 
 ### Task 9: Create Profiles, SOUL files, and least-privilege toolsets
 
@@ -502,7 +502,7 @@ ROLLBACK_FAILED
 7. Verify Coder cannot access Hermes/profile/config paths.
 8. Verify Architect-Planner is read-only for source code.
 9. Verify Documentator can write only docs/knowledge/changelog areas.
-10. Verify Browser sees only browser/Uber/vision capabilities and never credentials.
+10. Verify Browser sees only browser/commerce/vision capabilities and never credentials.
 11. Run `hermes config check` for every Profile without displaying secrets.
 
 ### Task 10: Create and map skills
@@ -514,8 +514,8 @@ ROLLBACK_FAILED
 3. Author `risk-classification` with the frozen critical-change list.
 4. Author `travel-planning` around real MCP schemas and mandatory questions.
 5. Reuse existing skills:
-   - `pi-tou-calendar` on default;
-   - `uber-eats-cart`, `computer-use`, `browser-automation` on Browser;
+   - the calendar adapter on default;
+   - the commerce-cart skill, `computer-use`, `browser-automation` on Browser;
    - `grounded-citations`, `blocked-page-recovery`, `arxiv` on Researcher;
    - `hermes-agent`, `hermes-architecture`, systematic debugging, TDD, skill authoring, and code review on Engineer;
    - coding/TDD/debugging/GitHub skills on Coder;
@@ -526,7 +526,7 @@ ROLLBACK_FAILED
 
 **Files:** browser capability manifest, `architecture/browser-operator.md`, replay fixtures, browser tests.
 
-1. Wrap existing managed Uber MCP session and semantic tools.
+1. Wrap the existing managed commerce MCP session and semantic tools.
 2. Implement Observe–Decide–Act–Verify–Recover event checkpoints.
 3. Invalidate DOM/SOM refs after state mutation.
 4. Implement grounded confidence signals and calibrated risk thresholds.
@@ -535,7 +535,7 @@ ROLLBACK_FAILED
 7. Add Sol review job only for critical/conflicting visual state.
 8. Delete screenshots on every terminal path, including crash recovery.
 9. Keep structured redacted trajectory logs only.
-10. Run mock storefront tests, then Uber read-only state, restaurant search, menu inspection, cart planning, checkout preview, confirmation expiry, and cancel tests. Never execute a real purchase during testing.
+10. Run mock storefront tests, then commerce read-only state, restaurant search, menu inspection, cart planning, checkout preview, confirmation expiry, and cancel tests. Never execute a real purchase during testing.
 
 ### Task 12: Technical change pipeline
 
@@ -565,12 +565,12 @@ Rules:
 4. Validate links, schema references, manifest hashes, staleness, and contradictions.
 5. Produce Mermaid system, sequence, state-machine, and security-boundary diagrams.
 6. Emit memory proposals; only `default` may probe contradictions and write Holographic Memory.
-7. Add Sunday 04:00 Europe/Madrid reconciliation cron with continuity and a no-delete policy.
+7. Add the configured weekly reconciliation cron with continuity and a no-delete policy.
 8. Ensure routine job output is delivered appropriately; health alerts remain host-side, not through TUI-only cron delivery.
 
 ### Task 14: Health watchdog adjustment
 
-**Existing file:** `/opt/data/mcp-dev/pi-tou-repair/health_alert.py`.
+**Existing file:** `${HERMES_MCP_DEV_ROOT}/host-adapter/health_alert.py`.
 
 1. Add tests for two consecutive critical samples, immediate essential-service failure, dedupe, changed fingerprint, reminders, and recovery.
 2. Preserve sanitized report validation and secret handling.
@@ -634,7 +634,7 @@ After acceptance, Documentator publishes the initial architecture baseline and t
 6. **Browser prompt injection/visual ambiguity:** typed broker tools first, sanitized semantic state, selective vision, confidence thresholds, Sol review only when justified, user confirmation for persistent effects.
 7. **Knowledge divergence:** Documentator-owned canonical docs and generated packs; workers cannot write private memory.
 8. **Hermes core update conflict:** tracked patch queue/worktrees, documented divergence, rebase and full acceptance suite.
-9. **Notification storms:** event milestones only, dedupe fingerprints, origin delivery, Telegram escalation policy.
+9. **Notification storms:** event milestones only, dedupe fingerprints, origin delivery, chat-channel escalation policy.
 10. **Unlimited-duration jobs:** no arbitrary timeout, but no-op/cycle guard, heartbeat/stale reclaim, two transient retries, resource pause, and explicit cancellation.
 
 ---
@@ -658,7 +658,7 @@ The architecture is complete only when:
 
 - All Profiles exist with the approved model/effort and minimal schemas.
 - `default` remains the only required human interface.
-- Telegram/Desktop session-origin routing works.
+- Chat-channel/desktop-client session-origin routing works.
 - Every initial intent has a deterministic route and readiness status.
 - All contracts validate and are versioned.
 - Kanban specialist workers survive restart and report structured events.
