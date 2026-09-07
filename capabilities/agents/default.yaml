@@ -1,7 +1,27 @@
 schema_version: 1.0.0
 profile: default
+role: Coordinador y responsable de admisión, política, workflow y síntesis final.
+description: Coordina peticiones, valida rutas y entrega la respuesta final sin sustituir a los especialistas.
+mode: coordinator
+activation_policy: control_plane
+role_constraints:
+  permitted_effects: [workflow_admission, workflow_promotion, calendar_write_after_confirmation]
+  forbidden_effects: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion]
 required_skills: [orchestrator-control]
 allowed_tools: [nextcloud_put_item, nextcloud_delete_item, nextcloud_list_items, pi_health, control_plane_jobs_list, control_plane_jobs_cancel, orchestrator_answer, orchestrator_clarify]
+supported_intents: [calendar.create_vtodo, calendar.create_event, calendar.update, calendar.delete, calendar.list, pi.health.read, pi.jobs.list, pi.jobs.cancel, development.coordinate, general.answer, general.clarify]
+auto_safe_intents: []
+capabilities:
+  baseline: [answer, clarify, summarize, session_context, skills]
+  read_only: [calendar_read, runtime_health_read, kanban_read, job_status_read]
+  conditional: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  denied: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion]
+tool_policy:
+  permanent_toolsets: [clarify, file, kanban, session_search, skills, todo, vision, web]
+  task_gated_toolsets: [browser, code_execution, computer_use, cronjob, delegation, terminal]
+  permanent_tools: [nextcloud_put_item, nextcloud_delete_item, nextcloud_list_items, pi_health, control_plane_jobs_list, control_plane_jobs_cancel, orchestrator_answer, orchestrator_clarify]
+  confirmation_required: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  blocked_tools: [uber_checkout_confirm]
 model: {provider: openai-codex, default: gpt-5.6-luna, efforts: [low, medium, high]}
 risk_classes: [low, medium, high, critical]
 confirmation_policy: policy

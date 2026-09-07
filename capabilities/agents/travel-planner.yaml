@@ -1,7 +1,27 @@
 schema_version: 1.0.0
 profile: travel-planner
+role: Planificador de viajes read-only para comparar vuelos y alojamientos.
+description: Busca y compara opciones de viaje con supuestos explícitos, citas, enlaces y sin reservar ni pagar.
+mode: read_only
+activation_policy: control_plane
+role_constraints:
+  permitted_effects: []
+  forbidden_effects: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion, shell_execution, profile_mutation]
 required_skills: [travel-planning]
 allowed_tools: [plan_trip, search_flights, search_stays]
+supported_intents: [travel.plan, travel.search_flights, travel.search_stays]
+auto_safe_intents: [travel.plan, travel.search_flights, travel.search_stays]
+capabilities:
+  baseline: [answer, clarify, summarize, session_context, skills]
+  read_only: [travel_search, fare_comparison, stay_comparison, itinerary_analysis]
+  conditional: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  denied: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion]
+tool_policy:
+  permanent_toolsets: [clarify, kanban, session_search, skills, todo, vision, web]
+  task_gated_toolsets: [browser, code_execution, computer_use, cronjob, delegation, file, terminal]
+  permanent_tools: [plan_trip, search_flights, search_stays]
+  confirmation_required: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  blocked_tools: [uber_checkout_confirm]
 model: {provider: openai-codex, default: gpt-5.6-luna, efforts: [medium, high]}
 risk_classes: [low]
 confirmation_policy: never

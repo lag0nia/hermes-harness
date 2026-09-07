@@ -20,7 +20,7 @@ def test_review_envelope_is_explicitly_routed_and_pinned() -> None:
         origin_session="cron:review",
     )
     assert envelope.intent is Intent.TECHNICAL_PLAN
-    assert envelope.parameters["requested_profile"] == "architect-planner"
+    assert envelope.parameters["requested_profile"] == "researcher"
     assert envelope.model_policy.model == "gpt-5.6-luna"
     assert envelope.model_policy.effort.value == "medium"
     assert envelope.source_text.startswith("Review the bounded sanitized")
@@ -66,7 +66,7 @@ def test_only_exact_policy_is_accepted() -> None:
         risk_class=RiskClass.MEDIUM,
         model_policy=bad,
         context_references=["observability-review:test"],
-        parameters={"requested_profile": "architect-planner", "candidates": []},
+        parameters={"requested_profile": "researcher", "candidates": []},
         source_text="Review the bounded sanitized failure evidence.",
     )
     with pytest.raises(ReviewExecutionBlocked):

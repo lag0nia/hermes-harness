@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from typing import Any
 from uuid import UUID
 
@@ -64,12 +64,14 @@ class ObservabilityBridge:
         self.dispatcher = dispatcher
 
     def plan(self, envelope: IntentEnvelope, *, mode: str = "shadow") -> BridgePlan:
-        if mode not in {"shadow", "read_only", "full"}:
-            raise BridgeDenied("bridge mode must be shadow, read_only, or full")
+        if mode not in {"shadow", "read_only"}:
+            raise BridgeDenied("bridge mode must be shadow or read_only")
         trace = envelope.trace_id
         try:
             route = self.router.route(envelope)
-            self.policy.evaluate(envelope.model_dump(mode="json"))
+            self.policy.evaluate(
+                envelope.model_dump(mode="json"), effective_profile=route.profile
+            )
         except (RoutingDenied, PolicyDenied) as exc:
             self._event(envelope, "bridge.denied", "denied", str(exc), mode=mode)
             return BridgePlan(
@@ -83,14 +85,10 @@ class ObservabilityBridge:
                 False,
                 str(exc),
             )
-        if mode == "full":
-            allowed = True
-            reason = None
-        else:
-            phase = Phase.SHADOW if mode == "shadow" else Phase.READ_ONLY
-            phase_decision = self.phase_policy.check(envelope.intent, phase)
-            allowed = phase_decision.allowed
-            reason = None if allowed else phase_decision.reason
+        phase = Phase.SHADOW if mode == "shadow" else Phase.READ_ONLY
+        phase_decision = self.phase_policy.check(envelope.intent, phase)
+        allowed = phase_decision.allowed
+        reason = None if allowed else phase_decision.reason
         self._event(
             envelope,
             "bridge.plan",
@@ -117,26 +115,10 @@ class ObservabilityBridge:
         return result
 
     def submit_full(self, envelope: IntentEnvelope) -> BridgePlan:
-        result = self.plan(envelope, mode="full")
-        if not result.allowed:
-            raise BridgeDenied(result.reason or "operation denied")
-        if self.dispatcher is None:
-            return result
-        dispatch = self.dispatcher.dispatch(envelope)
-        return replace(
-            result,
-            dispatch=BridgeDispatch(
-                job_id=dispatch.job_id,
-                direct=dispatch.direct,
-                kanban_task_id=dispatch.kanban_task_id,
-                children=tuple(
-                    BridgeDispatchChild(
-                        job_id=child.envelope.job_id,
-                        kanban_task_id=child.kanban_task_id,
-                    )
-                    for child in dispatch.children
-                ),
-            ),
+        del envelope
+        raise BridgeDenied(
+            "full submission is disabled until phase, confirmation, and durable completion "
+            "reconciliation are wired and verified"
         )
 
     def trace_context(self, trace_id: UUID) -> dict[str, Any]:
@@ -194,19 +176,6 @@ def build_stdio_server(bridge: ObservabilityBridge) -> Any:
         result["job_id"] = str(plan.job_id)
         return result
 
-    def dispatch_result(dispatch: BridgeDispatch) -> dict[str, Any]:
-        return {
-            "job_id": str(dispatch.job_id),
-            "direct": dispatch.direct,
-            "kanban_task_id": dispatch.kanban_task_id,
-            "children": [
-                {
-                    "job_id": str(child.job_id),
-                    "kanban_task_id": child.kanban_task_id,
-                }
-                for child in dispatch.children
-            ],
-        }
 
     @server.tool(name="harness_plan_intent", structured_output=True)
     def harness_plan_intent(envelope: dict[str, Any]) -> dict[str, Any]:
@@ -225,19 +194,6 @@ def build_stdio_server(bridge: ObservabilityBridge) -> Any:
         except Exception as exc:
             return {"ok": False, "error": str(exc)[:512]}
 
-    @server.tool(name="harness_submit", structured_output=True)
-    def harness_submit(envelope: dict[str, Any]) -> dict[str, Any]:
-        try:
-            result = bridge.submit_full(parse_envelope(envelope))
-            if result.dispatch is None:
-                raise BridgeDenied("full submission requires an attached dispatcher")
-            return {
-                "ok": True,
-                "plan": plan_result(result),
-                "dispatch": dispatch_result(result.dispatch),
-            }
-        except Exception as exc:
-            return {"ok": False, "error": str(exc)[:512]}
 
     @server.tool(name="harness_job_status", structured_output=True)
     def harness_job_status(job_id: str) -> dict[str, Any]:

@@ -24,7 +24,7 @@ def test_compile_generates_pack_for_every_profile_and_manifest_hashes() -> None:
     assert sorted(result["profiles"]) == profiles
     manifest = json.loads((output / "manifest.json").read_text())
     assert manifest["version"] == "1.0.0"
-    assert len(manifest["packs"]) == 7
+    assert len(manifest["packs"]) == 5
     for pack in manifest["packs"]:
         assert len(pack["sha256"]) == 64
         pack_path = output / pack["path"]

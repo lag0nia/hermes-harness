@@ -18,8 +18,8 @@ Para cambios de harness, MCP, plugins, skills o integraciones con impacto técni
 
 ## Clasificación
 - **R0:** cambio reversible y acotado; implementación directa, pruebas y ChangeEvent.
-- **R1:** dependencias o riesgo operativo; plan del Architect, implementación y pruebas.
-- **R2:** cambio crítico; Researcher, Architect, Engineer/Coder, revisión Sol independiente, replay, checkpoint y aprobación.
+- **R1:** dependencias o riesgo operativo; Researcher prepara investigación, arquitectura y plan, seguido de implementación y pruebas.
+- **R2:** cambio crítico; Researcher prepara investigación, arquitectura y plan, Engineer implementa, revisión Sol independiente, replay, checkpoint y aprobación.
 
 ## Procedimiento
 1. Inspecciona contratos, límites y estado actual.

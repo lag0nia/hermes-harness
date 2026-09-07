@@ -1,7 +1,27 @@
 schema_version: 1.0.0
 profile: browser-operator
+role: Operador de navegador para observación y acciones web autorizadas, con confirmación explícita.
+description: Investiga y prepara acciones web verificables sin introducir credenciales, pagos ni confirmar compras o reservas.
+mode: browser_prepare
+activation_policy: control_plane
+role_constraints:
+  permitted_effects: [reversible_browser_state]
+  forbidden_effects: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion, shell_execution]
 required_skills: [computer-use]
 allowed_tools: [browser, uber-broker]
+supported_intents: [browser.research, browser.order.prepare, browser.form.prepare, browser.auth_required]
+auto_safe_intents: []
+capabilities:
+  baseline: [answer, clarify, summarize, session_context, skills]
+  read_only: [browser_observation, web_research, form_state_inspection, result_verification]
+  conditional: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  denied: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion]
+tool_policy:
+  permanent_toolsets: [browser, clarify, computer_use, kanban, session_search, skills, todo, vision, web]
+  task_gated_toolsets: [code_execution, cronjob, delegation, file, terminal]
+  permanent_tools: [browser, uber-broker]
+  confirmation_required: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  blocked_tools: [uber_checkout_confirm]
 model: {provider: openai-codex, default: gpt-5.6-terra, efforts: [high, xhigh]}
 risk_classes: [low, medium, high, critical]
 confirmation_policy: exact-digest

@@ -21,7 +21,6 @@ def test_runtime_mcp_bridge_loads_real_routing_and_tools(tmp_path: Path):
     assert set(server._tool_manager._tools) == {
         "harness_plan_intent",
         "harness_submit_read_only",
-        "harness_submit",
         "harness_job_status",
         "harness_trace_context",
     }

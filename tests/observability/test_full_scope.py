@@ -1,14 +1,16 @@
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
+
 from hermes_harness.control_plane.contracts import Intent, IntentEnvelope, ModelPolicy, RiskClass
 from hermes_harness.control_plane.policy import PolicyEngine
 from hermes_harness.control_plane.router import Router
 from hermes_harness.observability import SQLiteObservabilitySink
-from hermes_harness.observability_bridge import ObservabilityBridge
+from hermes_harness.observability_bridge import BridgeDenied, ObservabilityBridge
 
 
-def test_full_mode_accepts_noncommercial_mutation_intents(tmp_path: Path) -> None:
+def test_full_mode_rejects_mutation_until_confirmation_is_wired(tmp_path: Path) -> None:
     router = Router(
         {Intent.CALENDAR_CREATE_EVENT: {"profile": "default", "confirmation": "required"}},
         {"default": {}},
@@ -39,6 +41,5 @@ def test_full_mode_accepts_noncommercial_mutation_intents(tmp_path: Path) -> Non
         parameters={},
         source_text="create an event",
     )
-    result = bridge.submit_full(request)
-    assert result.allowed is True
-    assert result.mode == "full"
+    with pytest.raises(BridgeDenied, match="disabled"):
+        bridge.submit_full(request)

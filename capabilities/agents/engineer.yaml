@@ -1,7 +1,27 @@
 schema_version: 1.0.0
 profile: engineer
+role: Implementador y verificador de cambios de código, infraestructura, skills, MCP y plugins.
+description: Implementa y prueba cambios justificados con TDD, aislamiento, trazabilidad y rollback reproducible.
+mode: controlled_change
+activation_policy: control_plane
+role_constraints:
+  permitted_effects: [workspace_file_changes, test_execution]
+  forbidden_effects: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion, production_mutation]
 required_skills: [test-driven-development]
 allowed_tools: [read_file, write_file, patch, terminal]
+supported_intents: [technical.change, technical.review, code.plan, code.change, code.review]
+auto_safe_intents: []
+capabilities:
+  baseline: [answer, clarify, summarize, session_context, skills]
+  read_only: [code_inspection, test_analysis, change_review, runtime_diagnostics]
+  conditional: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  denied: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion]
+tool_policy:
+  permanent_toolsets: [clarify, code_execution, file, kanban, session_search, skills, terminal, todo, vision, web]
+  task_gated_toolsets: [browser, computer_use, cronjob, delegation]
+  permanent_tools: [read_file, write_file, patch, terminal]
+  confirmation_required: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  blocked_tools: [uber_checkout_confirm]
 model: {provider: openai-codex, default: gpt-5.6-terra, efforts: [high, xhigh]}
 risk_classes: [low, medium, high, critical]
 confirmation_policy: policy

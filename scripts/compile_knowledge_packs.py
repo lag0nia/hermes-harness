@@ -13,9 +13,8 @@ DEFAULT_PROFILES = (
     "default",
     "browser-operator",
     "researcher",
-    "architect-planner",
+
     "engineer",
-    "coder",
     "documentator",
     "travel-planner",
 )

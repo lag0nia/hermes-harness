@@ -1,7 +1,27 @@
 schema_version: 1.0.0
 profile: researcher
-required_skills: [grounded-citations]
-allowed_tools: [web_search, web_extract]
+role: Investigador, arquitecto y planificador técnico de solo lectura.
+description: Investiga, diseña y planifica con fuentes verificables, dependencias, riesgos y criterios de aceptación.
+mode: read_only
+activation_policy: control_plane
+role_constraints:
+  permitted_effects: []
+  forbidden_effects: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion, profile_mutation, code_mutation]
+required_skills: [grounded-citations, technical-architecture-planning]
+allowed_tools: [read_file, search_files, web_search, web_extract]
+supported_intents: [technical.research, technical.plan]
+auto_safe_intents: [technical.research, technical.plan]
+capabilities:
+  baseline: [answer, clarify, summarize, session_context, skills]
+  read_only: [web_research, file_inspection, source_verification, architecture_analysis]
+  conditional: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  denied: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion]
+tool_policy:
+  permanent_toolsets: [clarify, file, kanban, session_search, skills, todo, vision, web]
+  task_gated_toolsets: [browser, code_execution, computer_use, cronjob, delegation, terminal]
+  permanent_tools: [read_file, search_files, web_search, web_extract]
+  confirmation_required: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  blocked_tools: [uber_checkout_confirm]
 model: {provider: openai-codex, default: gpt-5.6-luna, efforts: [medium, high]}
-risk_classes: [low]
+risk_classes: [low, medium]
 confirmation_policy: never

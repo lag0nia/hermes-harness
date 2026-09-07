@@ -231,8 +231,8 @@ class ReadOnlyReviewExecutor:
         expected = ModelPolicy(provider="openai-codex", model="gpt-5.6-luna", effort=Effort.MEDIUM)
         if envelope.model_policy != expected:
             raise ReviewExecutionBlocked("review model policy is not the pinned policy")
-        if envelope.parameters.get("requested_profile") != "architect-planner":
-            raise ReviewExecutionBlocked("review must target architect-planner")
+        if envelope.parameters.get("requested_profile") != "researcher":
+            raise ReviewExecutionBlocked("review must target researcher")
         if envelope.parameters.get("read_only") is not True:
             raise ReviewExecutionBlocked("review must explicitly be read-only")
         candidates = envelope.parameters.get("candidates")
@@ -262,7 +262,7 @@ class GatewayJsonRpcReviewExecutor(ReadOnlyReviewExecutor):
             created = self._transport.request(
                 "session.create",
                 {
-                    "profile": "architect-planner", "title": "Observability review",
+                    "profile": "researcher", "title": "Observability review",
                     "model": REVIEW_MODEL_POLICY["model"], "provider": REVIEW_MODEL_POLICY["provider"],
                     "reasoning_effort": REVIEW_MODEL_POLICY["effort"], "read_only": True,
                     "source": "observability-review",
@@ -340,8 +340,8 @@ def build_review_envelope(*, review_run_id: UUID, candidate_digest: str, candida
     model_policy = ModelPolicy(provider="openai-codex", model="gpt-5.6-luna", effort=Effort.MEDIUM)
     return IntentEnvelope(
         schema_version="1.0.0", job_id=uuid5(_REVIEW_NAMESPACE, f"review:{review_run_id}"), trace_id=uuid5(_REVIEW_NAMESPACE, f"trace:{review_run_id}"), origin_profile="default", origin_session=origin_session, delivery_target="control-plane", intent=Intent.TECHNICAL_PLAN, idempotency_key=f"observability-review:{review_run_id}", risk_class=RiskClass.MEDIUM, model_policy=model_policy, context_references=[f"observability-review:{review_run_id}"],
-        parameters={"requested_profile": "architect-planner", "read_only": True, "candidate_digest": candidate_digest, "candidates": [dict(candidate) for candidate in candidates], "output_contract": "architect-review-draft-1.0.0"},
-        source_text="Review the bounded sanitized failure evidence in this envelope as a read-only architect-planner. Your entire response MUST be one JSON object with exactly these keys and no others: schema_version, title, description, observed_behavior, undesired_behavior, desired_behavior, impact, acceptance_criteria. Set schema_version exactly to architect-review-draft-1.0.0. Use strings for title, description, observed_behavior, undesired_behavior, desired_behavior, and impact; use a non-empty array of strings for acceptance_criteria. Do not return markdown. Do not return schema_version 1.0.0, a review or contract wrapper, recommended_plan, risks, or rollback_strategy. Do not modify repositories, invoke tools that write, recover raw content, or include secrets.",
+        parameters={"requested_profile": "researcher", "read_only": True, "candidate_digest": candidate_digest, "candidates": [dict(candidate) for candidate in candidates], "output_contract": "architect-review-draft-1.0.0"},
+        source_text="Review the bounded sanitized failure evidence in this envelope as a read-only researcher. Your entire response MUST be one JSON object with exactly these keys and no others: schema_version, title, description, observed_behavior, undesired_behavior, desired_behavior, impact, acceptance_criteria. Set schema_version exactly to architect-review-draft-1.0.0. Use strings for title, description, observed_behavior, undesired_behavior, desired_behavior, and impact; use a non-empty array of strings for acceptance_criteria. Do not return markdown. Do not return schema_version 1.0.0, a review or contract wrapper, recommended_plan, risks, or rollback_strategy. Do not modify repositories, invoke tools that write, recover raw content, or include secrets.",
     )
 
 

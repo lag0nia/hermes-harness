@@ -86,7 +86,7 @@ def test_profile_model_and_effort_allowlist_is_enforced() -> None:
                     "context_size_justification": "large corpus",
                 },
                 intent="technical.research",
-                parameters={"requested_profile": "default"},
+                parameters={"requested_profile": "travel-planner"},
             )
         )
     with pytest.raises(PolicyDenied, match="effort"):
@@ -102,6 +102,22 @@ def test_profile_model_and_effort_allowlist_is_enforced() -> None:
         )
 
 
+def test_900k_is_allowed_for_default_coordination_with_a_justification() -> None:
+    decision = engine().evaluate(
+        envelope(
+            intent="general.answer",
+            model_policy={
+                "provider": "openai-codex",
+                "model": "gpt-5.6-luna-900k",
+                "effort": "medium",
+                "context_size_justification": "long-running coordination context",
+            },
+            parameters={"requested_profile": "default"},
+        )
+    )
+    assert decision.requires_confirmation is False
+
+
 def test_unknown_profile_is_denied_by_default() -> None:
     with pytest.raises(PolicyDenied, match="profile"):
         engine().evaluate(
@@ -114,3 +130,31 @@ def test_unknown_profile_is_denied_by_default() -> None:
                 },
             )
         )
+
+
+def test_retired_coder_profile_is_denied_by_default() -> None:
+    with pytest.raises(PolicyDenied, match="profile"):
+        engine().evaluate(
+            envelope(
+                parameters={"requested_profile": "coder"},
+                model_policy={
+                    "provider": "openai-codex",
+                    "model": "gpt-5.6-terra",
+                    "effort": "high",
+                },
+            )
+        )
+
+
+def test_effective_destination_profile_overrides_untrusted_requested_profile() -> None:
+    payload = envelope(
+        intent="technical.research",
+        model_policy={
+            "provider": "openai-codex",
+            "model": "gpt-5.6-luna",
+            "effort": "high",
+        },
+        parameters={"requested_profile": "default"},
+    )
+    with pytest.raises(PolicyDenied, match="model is not allowed"):
+        engine().evaluate(payload, effective_profile="engineer")

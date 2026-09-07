@@ -16,6 +16,23 @@ class RoutingDenied(ValueError):
     """A route cannot be proven safe and complete."""
 
 
+_MANIFEST_CAPABILITY_GROUPS = ("baseline", "read_only", "conditional", "denied")
+_REQUIRED_MANIFEST_KEYS = {
+    "profile",
+    "role",
+    "description",
+    "mode",
+    "activation_policy",
+    "role_constraints",
+    "required_skills",
+    "allowed_tools",
+    "supported_intents",
+    "auto_safe_intents",
+    "capabilities",
+    "tool_policy",
+}
+
+
 @dataclass(frozen=True)
 class Route:
     envelope: IntentEnvelope
@@ -53,6 +70,32 @@ class Router:
             manifest = yaml.safe_load(path.read_text())
             if not isinstance(manifest, dict) or manifest.get("schema_version") != "1.0.0":
                 raise RoutingDenied(f"missing capability schema: {path.name}")
+            missing_keys = _REQUIRED_MANIFEST_KEYS - set(manifest)
+            if missing_keys:
+                raise RoutingDenied(
+                    f"incomplete capability manifest {path.name}: {', '.join(sorted(missing_keys))}"
+                )
+            if manifest["activation_policy"] != "control_plane":
+                raise RoutingDenied(f"unsupported activation policy: {path.name}")
+            capabilities = manifest["capabilities"]
+            if not isinstance(capabilities, dict) or any(
+                not isinstance(capabilities.get(group), list)
+                for group in _MANIFEST_CAPABILITY_GROUPS
+            ):
+                raise RoutingDenied(f"incomplete capability groups: {path.name}")
+            groups = [set(capabilities[group]) for group in _MANIFEST_CAPABILITY_GROUPS]
+            if any(
+                groups[index] & groups[other]
+                for index in range(len(groups))
+                for other in range(index)
+            ):
+                raise RoutingDenied(f"overlapping capability groups: {path.name}")
+            supported_intents = manifest["supported_intents"]
+            auto_safe_intents = manifest["auto_safe_intents"]
+            if not isinstance(supported_intents, list) or not isinstance(auto_safe_intents, list):
+                raise RoutingDenied(f"invalid intent capabilities: {path.name}")
+            if not set(auto_safe_intents) <= set(supported_intents):
+                raise RoutingDenied(f"auto-safe intent is unsupported: {path.name}")
             profile = manifest.get("profile")
             if not isinstance(profile, str):
                 raise RoutingDenied(f"missing profile in manifest: {path.name}")
@@ -68,6 +111,11 @@ class Router:
             profile = route.get("profile") or route.get("capability")
             if profile not in manifests:
                 raise RoutingDenied(f"missing capability manifest: {profile}")
+            supported_intents = manifests[profile].get("supported_intents")
+            if not isinstance(supported_intents, list) or intent.value not in supported_intents:
+                raise RoutingDenied(
+                    f"profile {profile} does not support intent: {intent.value}"
+                )
             destination_count = int("profile" in route) + int("direct_tool" in route)
             if destination_count != 1:
                 raise RoutingDenied(f"route requires exactly one destination: {key}")

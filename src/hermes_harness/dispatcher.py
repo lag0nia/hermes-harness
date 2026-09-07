@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -47,12 +48,12 @@ PROFILE_BY_INTENT = {
     "travel.search_flights": "travel-planner",
     "travel.search_stays": "travel-planner",
     "technical.research": "researcher",
-    "technical.plan": "architect-planner",
+    "technical.plan": "researcher",
     "technical.change": "engineer",
     "technical.review": "engineer",
-    "code.plan": "coder",
-    "code.change": "coder",
-    "code.review": "coder",
+    "code.plan": "engineer",
+    "code.change": "engineer",
+    "code.review": "engineer",
     "docs.reconcile": "documentator",
     "docs.query": "documentator",
 }
@@ -80,7 +81,6 @@ class DevelopmentWorkflowResult:
 
 DEVELOPMENT_WORKFLOW: tuple[tuple[str, Intent, str], ...] = (
     ("research", Intent.TECHNICAL_RESEARCH, "researcher"),
-    ("plan", Intent.TECHNICAL_PLAN, "architect-planner"),
     ("change", Intent.TECHNICAL_CHANGE, "engineer"),
 )
 
@@ -127,13 +127,34 @@ class Dispatcher:
                 metadata={"intent": envelope.intent.value},
             )
             return DispatchResult(job.job_id, None, True)
+        requested_profile = envelope.parameters.get("delegation_profile")
+        if requested_profile is None:
+            emit_observation(
+                self._observability,
+                trace_id=envelope.trace_id,
+                job_id=job.job_id,
+                session_id=envelope.origin_session,
+                profile=envelope.origin_profile,
+                event_type="dispatcher.retained_default",
+                component="dispatcher",
+                phase="dispatch",
+                status="success",
+                summary=f"Specialist intent retained by default: {envelope.intent.value}",
+                metadata={"intent": envelope.intent.value},
+            )
+            return DispatchResult(job.job_id, None, True)
+        if not isinstance(requested_profile, str) or requested_profile != profile:
+            raise ValueError(
+                "explicit delegation profile does not match the intent destination: "
+                f"requested={requested_profile!r}, destination={profile!r}"
+            )
         if job.kanban_task_id:
             return DispatchResult(job.job_id, job.kanban_task_id, False)
         task_id = self.kanban.create_task(
             KanbanTask(
                 task_id="",
                 title=envelope.intent.value,
-                body=envelope.source_text,
+                body=self._handoff_body(envelope, assignee=profile),
                 assignee=profile,
                 idempotency_key=envelope.idempotency_key,
                 model=envelope.model_policy.model,
@@ -175,7 +196,7 @@ class Dispatcher:
                     KanbanTask(
                         task_id="",
                         title=child.intent.value,
-                        body=child.source_text,
+                        body=self._handoff_body(child, assignee=assignee),
                         assignee=assignee,
                         idempotency_key=child.idempotency_key,
                         parent_task_ids=(parent_task_id,) if parent_task_id else (),
@@ -269,6 +290,39 @@ class Dispatcher:
             return self.ledger.get_job(envelope.job_id)
         except KeyError:
             return self.ledger.create_job(envelope)
+
+    @staticmethod
+    def _handoff_body(envelope: IntentEnvelope, *, assignee: str) -> str:
+        """Build the versioned, deterministic worker handoff envelope.
+
+        The Kanban task itself supplies the canonical task identifier after
+        creation. The body intentionally carries only stable fields available
+        before that write, allowing the worker to return evidence to default
+        without treating an ephemeral Bot message as workflow state.
+        """
+        raw_limitations = envelope.parameters.get("limitations", [])
+        if not isinstance(raw_limitations, list) or not all(
+            isinstance(item, str) and item.strip() for item in raw_limitations
+        ):
+            raise ValueError("handoff limitations must be a list of non-empty strings")
+        handoff = {
+            "assignee": assignee,
+            "delivery_target": envelope.delivery_target,
+            "evidence_refs": [],
+            "hop_count": 0,
+            "idempotency_key": envelope.idempotency_key,
+            "job_id": str(envelope.job_id),
+            "limitations": raw_limitations,
+            "next_state": "return_to_default",
+            "origin_profile": envelope.origin_profile,
+            "origin_session": envelope.origin_session,
+            "parent_job_id": str(envelope.parent_job_id) if envelope.parent_job_id else None,
+            "phase": envelope.intent.value,
+            "schema_version": envelope.schema_version,
+            "status": "requested",
+            "summary": envelope.source_text,
+        }
+        return json.dumps(handoff, sort_keys=True, separators=(",", ":"))
 
     @staticmethod
     def _development_child_envelope(

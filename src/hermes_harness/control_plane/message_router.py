@@ -123,6 +123,10 @@ _TRAVEL_PLAN_ACTIONS = (
     r"\bprepara\w*\b",
     r"\bplan\w*\b",
     r"\bpregunt\w*\s+por\b",
+    r"\bquiero\s+viaj\w*\b",
+    r"\bme\s+gustaria\s+viaj\w*\b",
+    r"\bnecesito\s+viaj\w*\b",
+    r"\bvoy\s+a\s+viaj\w*\b",
     r"\borganize\w*\b",
 )
 _TRAVEL_SEARCH_ACTIONS = (
@@ -132,7 +136,7 @@ _TRAVEL_SEARCH_ACTIONS = (
     r"\bfind\w*\b",
 )
 _TRAVEL_CONTEXT = (
-    r"\bviaje\w*\b",
+    r"\bviaj\w*\b",
     r"\bvuelos?\b",
     r"\bflights?\b",
     r"\balojamiento\b",
@@ -212,6 +216,28 @@ _DOCUMENTATION_CONTEXT = (
     r"\bmanual\b",
 )
 
+_PROFILE_ALIASES: dict[str, tuple[str, ...]] = {
+    "researcher": ("researcher", "investigador"),
+    "engineer": ("engineer", "ingeniero"),
+    "travel-planner": ("travel-planner", "travel planner", "planificador de viajes"),
+    "browser-operator": ("browser-operator", "browser operator", "operador de navegador"),
+    "documentator": ("documentator", "documentador"),
+}
+_EXPLICIT_PROFILE_PREFIX = (
+    r"\b(?:hazlo|hacerlo|delegalo|delegarlo|usa|utiliza)\s+"
+    r"(?:con\s+|a\s+)?(?:el\s+)?(?:perfil\s+)?"
+)
+_TELEGRAM_AUTO_INTENTS = frozenset(
+    {
+        "travel.plan",
+        "travel.search_flights",
+        "travel.search_stays",
+        "technical.research",
+        "technical.plan",
+        "docs.query",
+    }
+)
+
 
 def _normalize(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text)
@@ -221,6 +247,34 @@ def _normalize(text: str) -> str:
 
 def _matches(text: str, patterns: tuple[str, ...]) -> bool:
     return any(re.search(pattern, text) for pattern in patterns)
+
+
+def _explicit_profiles(text: str) -> set[str]:
+    """Return only profiles selected through an unambiguous user command."""
+    selected: set[str] = set()
+    for profile, aliases in _PROFILE_ALIASES.items():
+        for alias in aliases:
+            escaped = re.escape(alias)
+            if re.search(rf"@{escaped}\b", text) or re.search(
+                rf"{_EXPLICIT_PROFILE_PREFIX}{escaped}\b", text
+            ):
+                selected.add(profile)
+    return selected
+
+
+def _without_explicit_profile_selectors(text: str) -> str:
+    """Remove selector syntax before matching request semantics.
+
+    This prevents words in a profile name, such as ``planner``, from changing the
+    intent of the actual request.
+    """
+    result = text
+    for aliases in _PROFILE_ALIASES.values():
+        for alias in aliases:
+            escaped = re.escape(alias)
+            result = re.sub(rf"@{escaped}\b", " ", result)
+            result = re.sub(rf"{_EXPLICIT_PROFILE_PREFIX}{escaped}\b", " ", result)
+    return re.sub(r"\s+", " ", result).strip()
 
 
 def _architect_intent(text: str) -> str | None:
@@ -257,65 +311,74 @@ def _travel_intent(text: str) -> str | None:
     return None
 
 
-def classify_message(text: str) -> MessageRouteDecision:
-    """Choose one specialist only when exactly one closed rule matches."""
-    normalized = _normalize(text)
-
-    if _matches(normalized, _DEVELOPMENT_COORDINATE_ACTIONS) and _matches(
-        normalized, _DEVELOPMENT_COORDINATE_CONTEXT
-    ):
-        return MessageRouteDecision(
-            RouteDisposition.SPECIALIST,
-            "default",
-            "development.coordinate",
-            "one deterministic specialist rule matched",
-        )
-
+def _specialist_candidates(text: str) -> list[tuple[str, str]]:
     candidates: list[tuple[str, str]] = []
 
-    if _matches(normalized, _RESEARCH_ACTIONS) and _matches(normalized, _RESEARCH_EVIDENCE):
+    if _matches(text, _RESEARCH_ACTIONS) and _matches(text, _RESEARCH_EVIDENCE):
         candidates.append(("researcher", "technical.research"))
 
-    if architect_intent := _architect_intent(normalized):
-        candidates.append(("architect-planner", architect_intent))
+    if architect_intent := _architect_intent(text):
+        candidates.append(("researcher", architect_intent))
 
-    code_intent = _code_intent(normalized)
+    code_intent = _code_intent(text)
     if code_intent:
-        candidates.append(("coder", code_intent))
+        candidates.append(("engineer", code_intent))
 
-    if travel_intent := _travel_intent(normalized):
+    if travel_intent := _travel_intent(text):
         candidates.append(("travel-planner", travel_intent))
 
-    if _matches(normalized, _BROWSER_ACTIONS) and _matches(normalized, _BROWSER_CONTEXT):
+    if _matches(text, _BROWSER_ACTIONS) and _matches(text, _BROWSER_CONTEXT):
         candidates.append(("browser-operator", "browser.form.prepare"))
-    elif _matches(normalized, _BROWSER_RESEARCH_ACTIONS) and _matches(
-        normalized, _BROWSER_CONTEXT
-    ):
+    elif _matches(text, _BROWSER_RESEARCH_ACTIONS) and _matches(text, _BROWSER_CONTEXT):
         candidates.append(("browser-operator", "browser.research"))
 
-    if _matches(normalized, _DOCUMENTATION_QUERY_ACTIONS) and _matches(
-        normalized, _DOCUMENTATION_CONTEXT
-    ):
+    if _matches(text, _DOCUMENTATION_QUERY_ACTIONS) and _matches(text, _DOCUMENTATION_CONTEXT):
         candidates.append(("documentator", "docs.query"))
     elif (
-        _matches(normalized, _DOCUMENTATION_ACTIONS)
-        and _matches(normalized, _DOCUMENTATION_CONTEXT)
-    ) or _matches(normalized, _DOCUMENTATION_CHANGE_REQUESTS):
+        _matches(text, _DOCUMENTATION_ACTIONS)
+        and _matches(text, _DOCUMENTATION_CONTEXT)
+    ) or _matches(text, _DOCUMENTATION_CHANGE_REQUESTS):
         candidates.append(("documentator", "docs.reconcile"))
 
-    engineer_action = _matches(normalized, _ENGINEER_CHANGE_ACTIONS) or (
-        _matches(normalized, _ENGINEER_REVIEW_ACTIONS)
-        and _matches(normalized, _ENGINEER_CONTEXT)
+    engineer_action = _matches(text, _ENGINEER_CHANGE_ACTIONS) or (
+        _matches(text, _ENGINEER_REVIEW_ACTIONS) and _matches(text, _ENGINEER_CONTEXT)
     )
-    if code_intent is None and engineer_action and _matches(normalized, _ENGINEER_CONTEXT):
+    if code_intent is None and engineer_action and _matches(text, _ENGINEER_CONTEXT):
         candidates.append(("engineer", "technical.change"))
 
-    if not candidates:
+    return candidates
+
+
+def classify_message(text: str) -> MessageRouteDecision:
+    """Route only an explicitly requested profile with a matching closed intent."""
+    normalized = _normalize(text)
+    selected_profiles = _explicit_profiles(normalized)
+    if not selected_profiles:
         return MessageRouteDecision(
             RouteDisposition.DEFAULT,
             None,
             None,
-            "no unique specialist rule matched",
+            "no explicit specialist profile was requested",
+        )
+    if len(selected_profiles) > 1:
+        return MessageRouteDecision(
+            RouteDisposition.AMBIGUOUS,
+            None,
+            None,
+            "multiple explicit specialist profiles were requested",
+        )
+
+    selected_profile = next(iter(selected_profiles))
+    normalized = _without_explicit_profile_selectors(normalized)
+
+    candidates = _specialist_candidates(normalized)
+
+    if not candidates:
+        return MessageRouteDecision(
+            RouteDisposition.AMBIGUOUS,
+            None,
+            None,
+            "explicit profile request did not match a supported intent",
         )
     if len(candidates) > 1:
         return MessageRouteDecision(
@@ -325,6 +388,13 @@ def classify_message(text: str) -> MessageRouteDecision:
             "multiple specialist rules matched",
         )
     profile, intent = candidates[0]
+    if profile != selected_profile:
+        return MessageRouteDecision(
+            RouteDisposition.AMBIGUOUS,
+            None,
+            None,
+            "explicit profile request conflicts with the supported intent",
+        )
     return MessageRouteDecision(
         RouteDisposition.SPECIALIST,
         profile,
@@ -333,4 +403,50 @@ def classify_message(text: str) -> MessageRouteDecision:
     )
 
 
-__all__ = ["MessageRouteDecision", "RouteDisposition", "classify_message"]
+def classify_ingress(
+    text: str,
+    *,
+    platform: str,
+    current_profile: str = "default",
+) -> MessageRouteDecision:
+    """Choose whether default should request one specialist for an ingress message.
+
+    Explicit profile selectors always use :func:`classify_message`. Automatic
+    classification is deliberately narrower: only a message entering the
+    default profile through Telegram is eligible. Desktop and specialist
+    profile messages stay on their current path, and ambiguous matches fail
+    closed instead of selecting a worker.
+    """
+    explicit = classify_message(text)
+    if explicit.disposition is not RouteDisposition.DEFAULT:
+        return explicit
+    if platform.casefold().split(":", 1)[0] != "telegram" or current_profile != "default":
+        return explicit
+
+    candidates = _specialist_candidates(_normalize(text))
+    if not candidates:
+        return explicit
+    if len(candidates) > 1:
+        return MessageRouteDecision(
+            RouteDisposition.AMBIGUOUS,
+            None,
+            None,
+            "multiple specialist rules matched for Telegram default ingress",
+        )
+    profile, intent = candidates[0]
+    if intent not in _TELEGRAM_AUTO_INTENTS:
+        return explicit
+    return MessageRouteDecision(
+        RouteDisposition.SPECIALIST,
+        profile,
+        intent,
+        "one deterministic Telegram default-ingress rule matched",
+    )
+
+
+__all__ = [
+    "MessageRouteDecision",
+    "RouteDisposition",
+    "classify_ingress",
+    "classify_message",
+]

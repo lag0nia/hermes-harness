@@ -57,3 +57,10 @@ def test_bridge_rejects_mutation_before_execution(bridge: ObservabilityBridge) -
     with pytest.raises(BridgeDenied):
         bridge.submit_read_only(item)
     assert bridge.trace_context(item.trace_id)["event_count"] == 1
+
+
+def test_bridge_rejects_full_planning_until_full_submission_is_safe(
+    bridge: ObservabilityBridge,
+) -> None:
+    with pytest.raises(BridgeDenied, match="shadow or read_only"):
+        bridge.plan(envelope(Intent.GENERAL_ANSWER), mode="full")

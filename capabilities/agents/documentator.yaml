@@ -1,7 +1,27 @@
 schema_version: 1.0.0
 profile: documentator
+role: Custodio de documentación canónica, diagramas, changelog y knowledge packs.
+description: Convierte eventos verificados en documentación versionada sin modificar código, políticas ni perfiles activos.
+mode: documentation_write
+activation_policy: control_plane
+role_constraints:
+  permitted_effects: [documentation_updates]
+  forbidden_effects: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion, code_mutation, policy_mutation, profile_mutation]
 required_skills: [grounded-citations]
 allowed_tools: [read_file, write_file, patch, search_files]
+supported_intents: [docs.reconcile, docs.query]
+auto_safe_intents: [docs.query]
+capabilities:
+  baseline: [answer, clarify, summarize, session_context, skills]
+  read_only: [document_inspection, citation_validation, knowledge_pack_audit, contradiction_detection]
+  conditional: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  denied: [credential_entry, payment, purchase_submission, booking_submission, conversation_deletion]
+tool_policy:
+  permanent_toolsets: [clarify, file, kanban, session_search, skills, todo, vision, web]
+  task_gated_toolsets: [browser, code_execution, computer_use, cronjob, delegation, terminal]
+  permanent_tools: [read_file, write_file, patch, search_files]
+  confirmation_required: [file_write, terminal_execution, code_execution, browser_interaction, profile_delegation, schedule_jobs, kanban_mutation, external_mcp]
+  blocked_tools: [uber_checkout_confirm]
 model: {provider: openai-codex, default: gpt-5.6-luna, efforts: [low, medium, high]}
 risk_classes: [low, medium]
 confirmation_policy: never

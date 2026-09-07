@@ -40,7 +40,7 @@ def _spec() -> dict[str, Any]:
         "no_agent": True,
         "script": OBSERVABILITY_REVIEW_SCRIPT,
         "repeat": None,
-        "profile": "architect-planner",
+        "profile": "researcher",
         "provider": "openai-codex",
         "model": "gpt-5.6-luna",
         "reasoning_effort": "medium",

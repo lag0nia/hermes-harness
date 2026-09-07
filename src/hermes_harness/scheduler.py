@@ -59,7 +59,7 @@ class JobSpec:
     def capacity(self) -> int:
         if self.units is not None:
             return self.units
-        return {"engineer": 2, "coder": 2, "browser": 3}.get(self.kind, 1)
+        return {"engineer": 2, "browser": 3}.get(self.kind, 1)
 
 
 @dataclass(frozen=True)

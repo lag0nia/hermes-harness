@@ -52,10 +52,15 @@ class PolicyEngine:
             {str(item) for item in retention.get("protected_from_deletion", [])},
         )
 
-    def evaluate(self, payload: dict[str, Any]) -> PolicyDecision:
+    def evaluate(
+        self,
+        payload: dict[str, Any],
+        *,
+        effective_profile: str | None = None,
+    ) -> PolicyDecision:
         reasons: set[str] = set()
         try:
-            self._evaluate_job(payload, reasons)
+            self._evaluate_job(payload, reasons, effective_profile=effective_profile)
         except PolicyDenied as exc:
             trace = _payload_uuid(payload, "trace_id")
             if trace is not None:
@@ -85,7 +90,13 @@ class PolicyEngine:
             )
         return decision
 
-    def _evaluate_job(self, job: dict[str, Any], reasons: set[str]) -> None:
+    def _evaluate_job(
+        self,
+        job: dict[str, Any],
+        reasons: set[str],
+        *,
+        effective_profile: str | None = None,
+    ) -> None:
         intent = str(job.get("intent", ""))
         model = job.get("model_policy")
         if not isinstance(model, dict):
@@ -95,7 +106,7 @@ class PolicyEngine:
         model_name = str(model.get("model", ""))
         effort = str(model.get("effort", ""))
         parameters = job.get("parameters", {})
-        requested_profile = (
+        requested_profile = effective_profile or (
             (parameters.get("requested_profile") if isinstance(parameters, dict) else None)
             or job.get("requested_profile")
             or job.get("origin_profile")

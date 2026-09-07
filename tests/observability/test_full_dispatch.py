@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from collections.abc import Mapping
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,7 +18,7 @@ from hermes_harness.dispatcher import Dispatcher
 from hermes_harness.integrations.hermes_kanban import KanbanTask
 from hermes_harness.mcp_server import create_server
 from hermes_harness.observability import SQLiteObservabilitySink
-from hermes_harness.observability_bridge import ObservabilityBridge
+from hermes_harness.observability_bridge import BridgeDenied, ObservabilityBridge
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -31,20 +31,25 @@ class RecordingKanban:
         self.created.append(task)
         return f"task-{len(self.created)}"
 
+    def show(self, task_id: str) -> dict[str, object]:
+        return {"id": task_id, "status": "todo"}
+
     def heartbeat(self, task_id: str) -> None:
         pass
 
     def comment(self, task_id: str, message: str) -> None:
         pass
 
-    def complete(self, task_id: str, result: dict[str, object]) -> None:
+    def complete(self, task_id: str, result: Mapping[str, object]) -> None:
         pass
 
     def block(self, task_id: str, reason: str) -> None:
         pass
 
 
-def make_envelope(intent: Intent, *, origin_profile: str) -> IntentEnvelope:
+def make_envelope(
+    intent: Intent, *, origin_profile: str, delegation_profile: str | None = None
+) -> IntentEnvelope:
     return IntentEnvelope(
         schema_version="1.0.0",
         job_id=uuid4(),
@@ -61,7 +66,11 @@ def make_envelope(intent: Intent, *, origin_profile: str) -> IntentEnvelope:
             effort=Effort.MEDIUM,
         ),
         context_references=[],
-        parameters={},
+        parameters=(
+            {"delegation_profile": delegation_profile}
+            if delegation_profile is not None
+            else {}
+        ),
         source_text="Research the harness dispatch boundary.",
     )
 
@@ -77,89 +86,52 @@ def make_bridge(tmp_path: Path, adapter: RecordingKanban) -> ObservabilityBridge
     )
 
 
-def test_submit_full_delegates_technical_research_to_recording_kanban(tmp_path: Path) -> None:
+def test_submit_full_rejects_specialist_delegation_until_confirmation_is_wired(
+    tmp_path: Path,
+) -> None:
     adapter = RecordingKanban()
     bridge = make_bridge(tmp_path, adapter)
-    envelope = make_envelope(Intent.TECHNICAL_RESEARCH, origin_profile="researcher")
+    envelope = make_envelope(
+        Intent.TECHNICAL_RESEARCH,
+        origin_profile="researcher",
+        delegation_profile="researcher",
+    )
 
-    result = bridge.submit_full(envelope)
+    with __import__("pytest").raises(BridgeDenied, match="disabled"):
+        bridge.submit_full(envelope)
 
-    assert result.allowed is True
-    assert result.dispatch is not None
-    assert result.dispatch.job_id == envelope.job_id
-    assert result.dispatch.direct is False
-    assert result.dispatch.kanban_task_id == "task-1"
-    assert [task.assignee for task in adapter.created] == ["researcher"]
+    assert adapter.created == []
 
 
-def test_submit_full_keeps_calendar_create_event_direct_without_kanban(tmp_path: Path) -> None:
+def test_submit_full_rejects_calendar_create_event_until_confirmation_is_wired(
+    tmp_path: Path,
+) -> None:
     adapter = RecordingKanban()
     bridge = make_bridge(tmp_path, adapter)
     envelope = make_envelope(Intent.CALENDAR_CREATE_EVENT, origin_profile="default")
 
-    result = bridge.submit_full(envelope)
+    with __import__("pytest").raises(BridgeDenied, match="disabled"):
+        bridge.submit_full(envelope)
 
-    assert result.allowed is True
-    assert result.dispatch is not None
-    assert result.dispatch.job_id == envelope.job_id
-    assert result.dispatch.direct is True
-    assert result.dispatch.kanban_task_id is None
     assert adapter.created == []
 
 
-def test_submit_full_coordinates_idempotent_development_kanban_chain(tmp_path: Path) -> None:
+def test_submit_full_rejects_development_workflow_until_confirmation_is_wired(
+    tmp_path: Path,
+) -> None:
     adapter = RecordingKanban()
     bridge = make_bridge(tmp_path, adapter)
     envelope = make_envelope(Intent.DEVELOPMENT_COORDINATE, origin_profile="default")
 
-    first = bridge.submit_full(envelope)
-    second = bridge.submit_full(envelope)
+    with __import__("pytest").raises(BridgeDenied, match="disabled"):
+        bridge.submit_full(envelope)
 
-    assert first.dispatch is not None
-    assert second.dispatch == first.dispatch
-    assert first.dispatch.job_id == envelope.job_id
-    assert first.dispatch.direct is False
-    assert first.dispatch.kanban_task_id is None
-    assert [(child.job_id, child.kanban_task_id) for child in first.dispatch.children] == [
-        (child.job_id, f"task-{index}")
-        for index, child in enumerate(first.dispatch.children, start=1)
-    ]
-    assert [task.title for task in adapter.created] == [
-        "technical.research",
-        "technical.plan",
-        "technical.change",
-    ]
-    assert [task.assignee for task in adapter.created] == [
-        "researcher",
-        "architect-planner",
-        "engineer",
-    ]
-    assert [task.parent_task_ids for task in adapter.created] == [(), ("task-1",), ("task-2",)]
-    assert [task.idempotency_key for task in adapter.created] == [
-        f"{envelope.idempotency_key}:research",
-        f"{envelope.idempotency_key}:plan",
-        f"{envelope.idempotency_key}:change",
-    ]
-    assert len(adapter.created) == 3
-    assert envelope.source_text not in str(asdict(first.dispatch))
+    assert adapter.created == []
 
 
-def test_harness_submit_returns_plan_and_dispatch_without_source_text(tmp_path: Path) -> None:
+def test_harness_submit_is_not_exposed_before_full_submission_is_safe(tmp_path: Path) -> None:
     adapter = RecordingKanban()
     server = create_server(make_bridge(tmp_path, adapter))
-    envelope = make_envelope(Intent.TECHNICAL_RESEARCH, origin_profile="researcher")
 
-    response = server._tool_manager._tools["harness_submit"].fn(
-        envelope.model_dump(mode="json")
-    )
-
-    assert response["ok"] is True
-    assert response["plan"]["job_id"] == str(envelope.job_id)
-    assert response["dispatch"] == {
-        "job_id": str(envelope.job_id),
-        "direct": False,
-        "kanban_task_id": "task-1",
-        "children": [],
-    }
-    assert envelope.source_text not in str(response)
-    assert [task.assignee for task in adapter.created] == ["researcher"]
+    assert "harness_submit" not in server._tool_manager._tools
+    assert adapter.created == []

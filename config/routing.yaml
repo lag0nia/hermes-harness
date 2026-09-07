@@ -16,13 +16,13 @@ routes:
   travel.search_flights: {profile: travel-planner}
   travel.search_stays: {profile: travel-planner}
   technical.research: {profile: researcher}
-  technical.plan: {profile: architect-planner}
+  technical.plan: {profile: researcher}
   technical.change: {profile: engineer, confirmation: policy}
   technical.review: {profile: engineer}
   development.coordinate: {profile: default}
-  code.plan: {profile: coder}
-  code.change: {profile: coder, confirmation: policy}
-  code.review: {profile: coder}
+  code.plan: {profile: engineer}
+  code.change: {profile: engineer, confirmation: policy}
+  code.review: {profile: engineer}
   docs.reconcile: {profile: documentator}
   docs.query: {profile: documentator}
   general.answer: {direct_tool: orchestrator_answer, capability: default}

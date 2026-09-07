@@ -30,6 +30,10 @@ def test_capacity_units_and_browser_singleton_are_enforced():
     assert decision.rejected["j4"] == "capacity"
 
 
+def test_retired_coder_kind_has_no_special_capacity_class() -> None:
+    assert JobSpec("legacy", "coder").capacity == 1
+
+
 def test_browser_session_is_singleton_even_when_capacity_is_available():
     scheduler = AdaptiveScheduler(capacity_units=10, max_jobs=5, reserve_units=0)
     jobs = [JobSpec("a", "browser", priority=10), JobSpec("b", "browser", priority=1)]

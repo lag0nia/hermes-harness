@@ -52,11 +52,11 @@ def test_existing_hermes_job_shape_is_reconciled_without_false_conflict() -> Non
     assert result.job_id == "job-1"
 
 
-def test_job_spec_is_pinned_to_architect_planner_without_an_install_run() -> None:
+def test_job_spec_is_pinned_to_researcher_without_an_install_run() -> None:
     created = []
     ensure_single_observability_review_job([], lambda spec: created.append(spec) or {"id": "job-2", **spec})
 
-    assert created[0]["profile"] == "architect-planner"
+    assert created[0]["profile"] == "researcher"
     assert created[0]["provider"] == "openai-codex"
     assert created[0]["model"] == "gpt-5.6-luna"
     assert created[0]["reasoning_effort"] == "medium"

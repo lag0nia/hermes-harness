@@ -27,8 +27,9 @@ def make_bridge(tmp_path: Path) -> ObservabilityBridge:
 
 def test_mcp_server_exposes_only_safe_tools(tmp_path: Path) -> None:
     server = create_server(make_bridge(tmp_path))
-    assert len(server._tool_manager._tools) == 5
+    assert len(server._tool_manager._tools) == 4
     assert "purge" not in server._tool_manager._tools
+    assert "harness_submit" not in server._tool_manager._tools
 
 
 def test_mcp_server_has_bounded_read_only_surface(tmp_path: Path) -> None:
@@ -37,7 +38,6 @@ def test_mcp_server_has_bounded_read_only_surface(tmp_path: Path) -> None:
     assert set(server._tool_manager._tools) == {
         "harness_plan_intent",
         "harness_submit_read_only",
-        "harness_submit",
         "harness_job_status",
         "harness_trace_context",
     }

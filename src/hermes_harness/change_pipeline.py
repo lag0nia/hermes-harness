@@ -17,12 +17,11 @@ class RiskLevel(StrEnum):
 
 class Owner(StrEnum):
     ENGINEER = "Engineer"
-    CODER = "Coder"
 
 
 class Stage(StrEnum):
+    # Researcher owns research, architecture, and planning as one stage.
     RESEARCH = "research"
-    ARCHITECT = "architect"
     IMPLEMENT = "implement"
     TEST = "test"
     SOL_REVIEW = "sol_review"
@@ -76,19 +75,13 @@ class ChangePipeline:
 
     @staticmethod
     def _owner(request: ChangeRequest) -> Owner:
-        return (
-            Owner.ENGINEER
-            if request.project.casefold() in {"harness", "hermes", "core"}
-            else Owner.CODER
-        )
+        return Owner.ENGINEER
 
     def plan(self, request: ChangeRequest) -> PipelinePlan:
         owner = self._owner(request)
         stages: list[Stage] = []
-        if request.risk is RiskLevel.R1:
-            stages.append(Stage.ARCHITECT)
-        elif request.risk is RiskLevel.R2:
-            stages.extend((Stage.RESEARCH, Stage.ARCHITECT))
+        if request.risk in {RiskLevel.R1, RiskLevel.R2}:
+            stages.append(Stage.RESEARCH)
         stages.extend((Stage.IMPLEMENT, Stage.TEST))
         if request.risk is RiskLevel.R2:
             stages.extend((Stage.SOL_REVIEW, Stage.REPLAY, Stage.CHECKPOINT))
@@ -103,7 +96,7 @@ class ChangePipeline:
     def execute(self, request: ChangeRequest, *, confirmed: bool = False) -> PipelineResult:
         plan = self.plan(request)
         for path in request.changed_paths:
-            self.validate_path(plan.owner, path)
+            self.validate_path(plan.owner, path, project=request.project)
         needs_confirmation = request.critical or request.risk is RiskLevel.R2
         if needs_confirmation and not confirmed:
             return PipelineResult(
@@ -124,7 +117,7 @@ class ChangePipeline:
         return PipelineResult(plan.owner, plan.stages, metadata, plan.sol_effort, "promoted")
 
     @staticmethod
-    def validate_path(owner: Owner, path: str) -> None:
+    def validate_path(owner: Owner, path: str, *, project: str = "external") -> None:
         normalized = posixpath.normpath(path.replace("\\", "/"))
         if (
             normalized == ".."
@@ -133,8 +126,8 @@ class ChangePipeline:
             or re.match(r"^[A-Za-z]:/", normalized)
         ):
             raise PermissionError("path escapes the project boundary")
-        if owner is Owner.CODER and (
+        if project.casefold() not in {"harness", "hermes", "core"} and (
             normalized.startswith(("src/hermes_harness/", "profiles/", "config/"))
             or normalized in {"pyproject.toml", "uv.lock"}
         ):
-            raise PermissionError("Coder cannot modify Hermes/profile/config paths")
+            raise PermissionError("external workspace cannot modify Hermes/profile/config paths")

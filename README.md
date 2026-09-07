@@ -82,7 +82,7 @@ For a small local routing check:
 
 ```bash
 uv run python -c \
-  'from hermes_harness.control_plane.message_router import classify_message; print(classify_message("Inspect the error logs"))'
+  'from hermes_harness.control_plane.message_router import classify_message; print(classify_message("Hazlo con Researcher: inspect the error logs"))'
 ```
 
 The gateway remains responsible for validating that a routed profile is served

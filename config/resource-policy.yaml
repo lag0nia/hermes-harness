@@ -10,7 +10,6 @@ unit_costs:
   documentator: 1
   visual_auditor: 1
   engineer: 2
-  coder: 2
   browser: 3
 memory:
   reserve_bytes: 471859200
